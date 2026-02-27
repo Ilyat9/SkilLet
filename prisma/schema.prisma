@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  image         String?
+  githubId      String?   @unique
+  createdAt     DateTime  @default(now())
+
+  trees         Tree[]
+  progresses    UserProgress[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Tree {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  nodes       Node[]
+  progresses  UserProgress[]
+
+  @@index([authorId])
+  @@index([isPublic])
+}
+
+model Node {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  resources   Json     // [{ type: "video"|"article", url: string, title: string }]
+  positionX   Float    @default(0)
+  positionY   Float    @default(0)
+  difficulty  Int      @default(1)    // 1-10
+
+  treeId      String
+  tree        Tree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  outgoingEdges Edge[]         @relation("EdgeSource")
+  incomingEdges Edge[]         @relation("EdgeTarget")
+  progresses    UserProgress[]
+
+  @@index([treeId])
+}
+
+model Edge {
+  id       String @id @default(cuid())
+  treeId   String
+
+  sourceId String
+  source   Node   @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+
+  targetId String
+  target   Node   @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId])
+  @@index([treeId])
+}
+
+model UserProgress {
+  id          String   @id @default(cuid())
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  treeId      String
+  tree        Tree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  nodeId      String
+  node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, nodeId])
+  @@index([userId, treeId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
