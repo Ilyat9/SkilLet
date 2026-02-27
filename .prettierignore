@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+build
+dist
+.prisma
+*.db
+*.db-journal
+coverage
+.next-env.d.ts
