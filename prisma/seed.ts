@@ -1,6 +1,7 @@
 import 'server-only'
 import { PrismaClient } from '@prisma/client'
 import type { Prisma } from '@prisma/client'
+import { Node as PrismaNode } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -23,7 +24,7 @@ type NodeData = {
   resourceTitle?: string
 }
 
-function generateNodes(treeId: string, authorId: string): Prisma.Node[] {
+function generateNodes(treeId: string, authorId: string): PrismaNode[] {
   const nodes: PrismaNode[] = []
   let nodeIdCounter = 0
 
