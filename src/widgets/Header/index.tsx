@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@/shared/lib/auth'
+import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
 import { Button } from '@/shared/ui/Button'
 import { useRouter } from 'next/navigation'

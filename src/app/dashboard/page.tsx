@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/shared/lib/auth'
+import { useAuth } from '@/features/auth/ui/useAuth'
 import { Button } from '@/shared/ui/Button'
 import { TreeCard } from '@/entities/tree/ui/TreeCard'
 import { TreeWithRelations } from '@/entities/tree/model/types'

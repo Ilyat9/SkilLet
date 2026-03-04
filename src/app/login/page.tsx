@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/shared/lib/auth'
+import { useAuth } from '@/features/auth/ui/useAuth'
 import { AuthButton } from '@/features/auth/ui/AuthButton'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'

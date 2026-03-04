@@ -11,14 +11,11 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
-  addEdge,
-  Connection,
   type Node,
   type Edge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { SkillNode } from '@/entities/node/ui/SkillNode'
-import { NODE_STATUS, NodeStatus } from '@/shared/constants'
+import { CustomNode } from './CustomNode'
 import { Node as PrismaNode, Edge as PrismaEdge } from '@prisma/client'
 import { Badge } from '@/shared/ui/Badge'
 
@@ -28,19 +25,6 @@ interface SkillTreeViewerProps {
   completedNodeIds: Set<string>
   onNodeClick?: (nodeId: string) => void
   onResourceClick?: (nodeId: string, e: React.MouseEvent) => void
-}
-
-interface CustomNodeData {
-  title: string
-  description?: string
-  difficulty: number
-  resources?: Array<{ type: string; url: string; title: string }>
-}
-
-function CustomNode({ data, id, selected }: Node & { data: CustomNodeData }) {
-  const status = selected ? NODE_STATUS.DONE : NODE_STATUS.AVAILABLE
-
-  return <SkillNode node={data} status={status} isInteractive />
 }
 
 export function SkillTreeViewer({
@@ -146,43 +130,6 @@ export function SkillTreeViewer({
           </Panel>
         </ReactFlow>
       </ReactFlowProvider>
-    </div>
-  )
-}
-        nodes={reactFlowNodes}
-        edges={reactFlowEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={{ custom: CustomNode }}
-        fitView
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={true}
-      >
-        <Background />
-        <MiniMap />
-        <Controls />
-        <Panel position="top-left">
-          <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-            <h3 className="font-semibold text-sm mb-2">Легенда</h3>
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 border-2 rounded bg-gray-900" />
-                <span>Заблокирован</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 border-2 rounded bg-gray-800 border-yellow-500" />
-                <span>Доступен</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 border-2 rounded bg-gray-800 border-green-500" />
-                <span>Пройден</span>
-              </div>
-            </div>
-          </div>
-        </Panel>
-      </ReactFlow>
     </div>
   )
 }
