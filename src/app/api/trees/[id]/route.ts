@@ -17,7 +17,7 @@ export async function GET(
     const session = await auth()
     const userId = session?.user?.id
 
-    const include: any = {
+    const include: Record<string, unknown> = {
       _count: { select: { nodes: true } },
       author: {
         select: { id: true, name: true, image: true },
