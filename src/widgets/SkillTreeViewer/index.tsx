@@ -29,13 +29,13 @@ interface SkillTreeViewerProps {
 export function SkillTreeViewer({
   nodes,
   edges,
-  completedNodeIds,
+  completedNodeIds: _completedNodeIds,
   onNodeClick: _onNodeClick,
   onResourceClick: _onResourceClick,
 }: SkillTreeViewerProps) {
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<Node>([])
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState<Edge>([])
-  const { fitView: _fitView } = useReactFlow()
+  useReactFlow()
 
   useEffect(() => {
     const flowNodes = nodes.map((node) => ({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import {
   addEdge,
   Connection,
@@ -12,7 +12,6 @@ import {
   useEdgesState,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useReactFlow } from '@xyflow/react'
 
 interface Node extends FlowNode {
   data: {
