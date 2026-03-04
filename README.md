@@ -12,20 +12,7 @@
 
 ---
 
-## 👤 Автор
-
-**Илья** — Backend Developer & AI Builder
-
-Backend-разработчик и создатель AI-систем, специализирующийся на быстрой сборке рабочих сервисов в продакшн.
-
-- 🔗 [GitHub](https://github.com/Ilyat9)
-- 💼 [CogniWeb Agent](https://github.com/Ilyat9/CogniWeb_Agent)
-- 🏰 [Fortress API](https://github.com/Ilyat9/fortress-api)
-- ⚡ [AI Summary](https://github.com/Ilyat9/ai-summary)
-- 📧 Email: afrom205@gmail.com
-- 💬 Telegram: [@NeIlyat9](https://t.me/NeIlyat9)
-
-### Стек технологий автора
+### Стек технологий проекта
 
 **Backend & Infra:** FastAPI · PostgreSQL · Redis · Celery · Docker · GitHub Actions
 **AI & Automation:** LLM APIs (OpenRouter, Gemini) · Playwright · Prompt Engineering · Web Scraping
@@ -288,7 +275,6 @@ git commit -m "Add new feature"
 
 - 💬 [Telegram](https://t.me/NeIlyat9) — вопросы и обсуждение
 - 📧 Email: afrom205@gmail.com
-- 🔗 [GitHub](https://github.com/Ilyat9)
 
 ### Как внести вклад
 
@@ -302,13 +288,7 @@ git commit -m "Add new feature"
 
 ⭐ Звёзды на GitHub помогают развитию проекта!
 
----
-
-## Спасибо
-
-Благодарю всех участников проекта за участие и вклад.
 
 ---
 
-*Создано с ❤️ командой SkilLet*
 *Автор: [Илья](https://github.com/Ilyat9)*
