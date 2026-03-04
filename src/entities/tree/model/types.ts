@@ -35,3 +35,9 @@ export interface TreeUpdateInput {
   description?: string
   isPublic?: boolean
 }
+
+export const TreeUpdateSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().max(1000).optional(),
+  isPublic: z.boolean().optional(),
+})

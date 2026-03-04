@@ -30,13 +30,13 @@ interface SkillTreeViewerProps {
 export function SkillTreeViewer({
   nodes,
   edges,
-  completedNodeIds,
+  completedNodeIds: _completedNodeIds,
   onNodeClick,
   onResourceClick,
 }: SkillTreeViewerProps) {
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<Node>([])
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState<Edge>([])
-  const { fitView } = useReactFlow()
+  const { fitView: _fitView } = useReactFlow()
 
   useEffect(() => {
     const flowNodes = nodes.map((node) => ({
@@ -72,7 +72,7 @@ export function SkillTreeViewer({
     [setReactFlowEdges]
   )
 
-  const handleNodeClick = useCallback(
+  const _handleNodeClick = useCallback(
     (node: Node) => {
       if (onNodeClick) {
         onNodeClick(node.id)
@@ -81,7 +81,7 @@ export function SkillTreeViewer({
     [onNodeClick]
   )
 
-  const handleResourceClick = useCallback(
+  const _handleResourceClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
       event.stopPropagation()
       if (onResourceClick) {

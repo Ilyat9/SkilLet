@@ -13,7 +13,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [_, setIsLoading] = useState(false)
 
   if (status === 'loading') {
     return (

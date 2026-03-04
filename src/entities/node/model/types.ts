@@ -1,5 +1,4 @@
-import { Node as PrismaNode, Edge as PrismaEdge } from '@prisma/client'
-import { z } from 'zod'
+import { Edge as PrismaEdge } from '@prisma/client'
 
 export interface Node {
   id: string

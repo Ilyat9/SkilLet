@@ -14,7 +14,7 @@ interface ProgressSidebarProps {
 }
 
 export function ProgressSidebar({
-  tree,
+  tree: _tree,
   progress,
   totalNodes,
   completedNodes,

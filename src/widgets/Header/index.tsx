@@ -5,7 +5,7 @@ import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
 import { Button } from '@/shared/ui/Button'
 import { useRouter } from 'next/navigation'
-import { User, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 
 export function Header() {
   const { data: session, status } = useAuth()

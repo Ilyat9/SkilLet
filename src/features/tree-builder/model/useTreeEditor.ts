@@ -1,20 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   addEdge,
-  Background,
   Connection,
   NodeChange,
   EdgeChange,
   Node as FlowNode,
   Edge as FlowEdge,
-  ReactFlow,
   useNodesState,
   useEdgesState,
-  Panel,
-  Controls,
-  Position,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useReactFlow } from '@xyflow/react'
@@ -32,7 +27,7 @@ interface Edge extends FlowEdge {
   targetHandle?: string
 }
 
-interface UseTreeEditorReturn {
+export interface UseTreeEditorReturn {
   nodes: Node[]
   edges: Edge[]
   onNodesChange: (changes: NodeChange[]) => void
@@ -48,8 +43,8 @@ interface UseTreeEditorReturn {
 export function useTreeEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null)
-  const { getNodes, getEdges, fitView } = useReactFlow()
+  const [_selectedNode, _setSelectedNode] = useState<Node | null>(null)
+  const { _getNodes, _getEdges, _fitView } = useReactFlow()
 
   const onConnect = useCallback(
     (connection: Connection) => {

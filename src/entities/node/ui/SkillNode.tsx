@@ -1,7 +1,6 @@
 'use client'
 
 import { Node } from '../model/types'
-import { Badge } from '@/shared/ui/Badge'
 import { ProgressBar } from '@/shared/ui/ProgressBar'
 import { NODE_STATUS, NodeStatus } from '@/shared/constants'
 import { Lock, Unlock, CheckCircle2, ExternalLink } from 'lucide-react'

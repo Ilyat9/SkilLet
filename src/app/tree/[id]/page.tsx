@@ -20,7 +20,7 @@ export default function TreePage() {
   const [nodes, setNodes] = useState<PrismaNode[]>([])
   const [edges, setEdges] = useState<PrismaEdge[]>([])
   const [progress, setProgress] = useState<UserProgress | null>(null)
-  const [completedNodeIds, setCompletedNodeIds] = useState<Set<string>>(new Set())
+  const [_, setCompletedNodeIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -29,6 +29,7 @@ export default function TreePage() {
       router.push('/login')
       return
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchTree()
   }, [status, params.id, router])
 
