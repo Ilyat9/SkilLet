@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { Button } from '@/shared/ui/Button'
-import { useAuth } from '@/shared/lib/auth'
+import { useAuth } from '@/features/auth/ui/useAuth'
 import { Badge } from '@/shared/ui/Badge'
 import { Node } from '@/entities/node/model/types'
-import { NODE_STATUS, NodeStatus } from '@/shared/constants'
+import { NODE_STATUS } from '@/shared/constants'
 import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
 import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 

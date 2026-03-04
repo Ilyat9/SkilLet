@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/shared/lib/auth'
+import { useAuth } from '@/features/auth/ui/useAuth'
 import { SkillTreeViewer } from '@/widgets/SkillTreeViewer'
 import { ProgressSidebar } from '@/widgets/ProgressSidebar'
 import { MarkCompleteButton } from '@/features/progress-tracker/ui/MarkCompleteButton'

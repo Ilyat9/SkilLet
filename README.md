@@ -324,12 +324,6 @@ src/
 
 - 💬 [Telegram](https://t.me/NeIlyat9) — обсуждение и вопросы
 - 📧 Email: afrom205@gmail.com
-- 🐦 Twitter: [@Ilyat9](https://twitter.com/Ilyat9)
-
-### Бейджи
-
-![GitHub stars](https://img.shields.io/github/stars/Ilyat9/SkilLet?style=social)
-![GitHub forks](https://img.shields.io/github/forks/Ilyat9/SkilLet?style=social)
 
 ---
 
@@ -340,4 +334,3 @@ src/
 ---
 
 *Автор проекта: [Илья](https://github.com/Ilyat9)*
-*✨ Давайте учиться вместе, превращая навыки в достижения!*

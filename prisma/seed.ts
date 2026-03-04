@@ -1,3 +1,4 @@
+import 'server-only'
 import { PrismaClient, Node, Edge } from '@prisma/client'
 
 const prisma = new PrismaClient()
