@@ -9,7 +9,6 @@ import { Node as PrismaNode, Edge as PrismaEdge, Tree, UserProgress } from '@pri
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 import { Loader2, ArrowLeft } from 'lucide-react'
-import { Badge } from '@/shared/ui/Badge'
 
 export default function TreePage() {
   const params = useParams()
@@ -29,7 +28,6 @@ export default function TreePage() {
       router.push('/login')
       return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchTree()
   }, [status, params.id, router])
 

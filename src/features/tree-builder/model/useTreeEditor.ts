@@ -43,8 +43,8 @@ export interface UseTreeEditorReturn {
 export function useTreeEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
-  const [_selectedNode, _setSelectedNode] = useState<Node | null>(null)
-  const { _getNodes, _getEdges, _fitView } = useReactFlow()
+
+  const onConnect = useCallback(
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -90,6 +90,5 @@ export function useTreeEditor() {
     onNodeDelete,
     onEdgeDelete,
     addNode,
-    fitView,
   }
 }

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { topic, nodeCount: _nodeCount } = body
+    const { topic } = body
 
     if (!topic) {
       return NextResponse.json(

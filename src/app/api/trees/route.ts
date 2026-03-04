@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
     const isPublic = searchParams.get('isPublic') === 'true'
 
     const session = await auth()
-    const _userId = session?.user?.id
 
     const trees = await prisma.tree.findMany({
       where: {

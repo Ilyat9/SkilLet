@@ -17,7 +17,6 @@ import {
 import '@xyflow/react/dist/style.css'
 import { CustomNode } from './CustomNode'
 import { Node as PrismaNode, Edge as PrismaEdge } from '@prisma/client'
-import { Badge } from '@/shared/ui/Badge'
 
 interface SkillTreeViewerProps {
   nodes: PrismaNode[]
@@ -70,25 +69,6 @@ export function SkillTreeViewer({
       setReactFlowEdges((eds) => addEdge(connection, eds))
     },
     [setReactFlowEdges]
-  )
-
-  const _handleNodeClick = useCallback(
-    (node: Node) => {
-      if (onNodeClick) {
-        onNodeClick(node.id)
-      }
-    },
-    [onNodeClick]
-  )
-
-  const _handleResourceClick = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      event.stopPropagation()
-      if (onResourceClick) {
-        onResourceClick(node.id, event)
-      }
-    },
-    [onResourceClick]
   )
 
   return (
