@@ -1,5 +1,6 @@
 import 'server-only'
-import { PrismaClient, Node, Edge } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -22,11 +23,11 @@ type NodeData = {
   resourceTitle?: string
 }
 
-function generateNodes(treeId: string, authorId: string): Node[] {
-  const nodes: Node[] = []
+function generateNodes(treeId: string, authorId: string): Prisma.Node[] {
+  const nodes: PrismaNode[] = []
   let nodeIdCounter = 0
 
-  const createNode = (data: NodeData): Node => {
+  const createNode = (data: NodeData): PrismaNode => {
     const node = {
       id: `node-${treeId}-${nodeIdCounter++}`,
       title: data.title,
@@ -36,7 +37,7 @@ function generateNodes(treeId: string, authorId: string): Node[] {
       positionY: data.positionY,
       difficulty: data.difficulty,
       treeId,
-    } as Node
+    }
     nodes.push(node)
     return node
   }
@@ -50,7 +51,7 @@ function generateNodes(treeId: string, authorId: string): Node[] {
     difficulty: 1,
   })
 
-  // Основной путь: 12 узлов для Frontend разработчика
+  // Основной путь: 16 узлов для Frontend разработчика
   const frontendPath = [
     { title: 'HTML & CSS Базовый', positionX: 0, positionY: -50, difficulty: 1, resourceType: 'article', resourceUrl: 'https://developer.mozilla.org/ru/docs/Web/HTML', resourceTitle: 'MDN: HTML' },
     { title: 'Вёрстка с Flexbox', positionX: 100, positionY: -50, difficulty: 2, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=zw8dLx1D9Uw', resourceTitle: 'Flexbox Froggy' },
@@ -67,7 +68,7 @@ function generateNodes(treeId: string, authorId: string): Node[] {
     { title: 'Базовый Routing', positionX: 600, positionY: 250, difficulty: 6, resourceType: 'article', resourceUrl: 'https://nextjs.org/docs/routing/introduction', resourceTitle: 'Next.js Routing' },
     { title: 'Tailwind CSS', positionX: 700, positionY: 250, difficulty: 2, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=Q8xrEgnh77I', resourceTitle: 'Tailwind CSS Basics' },
     { title: 'CI/CD Pipeline', positionX: 600, positionY: 350, difficulty: 7, resourceType: 'article', resourceUrl: 'https://vercel.com/docs/concepts/deployments/overview', resourceTitle: 'Vercel Deployment' },
-    { title: 'Заключение', positionX: 700, positionY: 350, description: 'Вы изучили основы Frontend разработки!', positionX: 700, positionY: 450, difficulty: 10, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=6B8vcbsJIsM', resourceTitle: 'Frontend Roadmap' },
+    { title: 'Заключение', positionX: 700, positionY: 350, description: 'Вы изучили основы Frontend разработки!', positionY: 450, difficulty: 10, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=6B8vcbsJIsM', resourceTitle: 'Frontend Roadmap' },
   ]
 
   const skillPath = [
@@ -93,8 +94,8 @@ function generateNodes(treeId: string, authorId: string): Node[] {
   return nodes
 }
 
-function generateEdges(treeId: string, nodes: Node[]): Edge[] {
-  const edges: Edge[] = []
+function generateEdges(treeId: string, nodes: PrismaNode[]): PrismaEdge[] {
+  const edges: PrismaEdge[] = []
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
 
   const createEdge = (sourceId: string, targetId: string) => {
@@ -110,7 +111,7 @@ function generateEdges(treeId: string, nodes: Node[]): Edge[] {
     'node-skillet-start-0': [
       'node-skillet-start-1',
       'node-skillet-start-4',
-      'node-skillet-start-15',
+      'node-skillet-start-16',
     ],
     'node-skillet-start-1': ['node-skillet-start-3'],
     'node-skillet-start-3': ['node-skillet-start-5'],
@@ -124,8 +125,8 @@ function generateEdges(treeId: string, nodes: Node[]): Edge[] {
     'node-skillet-start-11': ['node-skillet-start-12'],
     'node-skillet-start-12': ['node-skillet-start-13'],
     'node-skillet-start-13': ['node-skillet-start-14'],
-    'node-skillet-start-14': ['node-skillet-start-15'],
-    'node-skillet-start-15': ['node-skillet-start-17'],
+    'node-skillet-start-14': ['node-skillet-start-16'],
+    'node-skillet-start-16': ['node-skillet-start-17'],
     'node-skillet-start-4': ['node-skillet-start-3', 'node-skillet-start-5', 'node-skillet-start-10', 'node-skillet-start-14'],
   }
 
