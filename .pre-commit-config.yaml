@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: prettier
+        name: Prettier
+        entry: npx prettier --write
+        language: node
+        files: \.(ts|tsx|js|jsx|md|css)$
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: npx eslint
+        language: node
+        files: \.(ts|tsx)$
+        pass_filenames: false
