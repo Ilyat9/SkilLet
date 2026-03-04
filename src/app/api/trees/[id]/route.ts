@@ -17,23 +17,28 @@ export async function GET(
     const session = await auth()
     const userId = session?.user?.id
 
+    const include: any = {
+      _count: { select: { nodes: true } },
+      author: {
+        select: { id: true, name: true, image: true },
+      },
+      nodes: {
+        include: {
+          outgoingEdges: true,
+          incomingEdges: true,
+        },
+      },
+    }
+
+    if (userId) {
+      include.progresses = {
+        where: { userId },
+      }
+    }
+
     const tree = await prisma.tree.findUnique({
       where: { id: treeId },
-      include: {
-        _count: { select: { nodes: true } },
-        author: {
-          select: { id: true, name: true, image: true },
-        },
-        nodes: {
-          include: {
-            outgoingEdges: true,
-            incomingEdges: true,
-          },
-        },
-        progresses: userId ? {
-          where: { userId },
-        } : undefined,
-      },
+      include,
     })
 
     if (!tree) {
