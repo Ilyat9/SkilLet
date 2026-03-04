@@ -61,7 +61,8 @@ export async function GET(
 
     const treeWithRelations = {
       ...tree,
-      nodes: tree.nodes.map((node) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      nodes: tree.nodes.map((node: any) => ({
         ...node,
         outgoingEdges: node.outgoingEdges,
         incomingEdges: node.incomingEdges,
