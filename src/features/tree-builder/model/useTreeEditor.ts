@@ -45,8 +45,6 @@ export function useTreeEditor() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   const onConnect = useCallback(
-
-  const onConnect = useCallback(
     (connection: Connection) => {
       setEdges((eds) => addEdge({ ...connection, type: 'smoothstep' }, eds))
     },

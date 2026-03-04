@@ -9,6 +9,7 @@ import { Node as PrismaNode, Edge as PrismaEdge, Tree, UserProgress } from '@pri
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 import { Loader2, ArrowLeft } from 'lucide-react'
+import { Badge } from '@/shared/ui/Badge'
 
 export default function TreePage() {
   const params = useParams()
@@ -19,7 +20,7 @@ export default function TreePage() {
   const [nodes, setNodes] = useState<PrismaNode[]>([])
   const [edges, setEdges] = useState<PrismaEdge[]>([])
   const [progress, setProgress] = useState<UserProgress | null>(null)
-  const [_, setCompletedNodeIds] = useState<Set<string>>(new Set())
+  const [completedNodeIds, setCompletedNodeIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
