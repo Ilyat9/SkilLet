@@ -17,7 +17,8 @@ export async function GET(
     const session = await auth()
     const userId = session?.user?.id
 
-    const include: Record<string, unknown> = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const include: any = {
       _count: { select: { nodes: true } },
       author: {
         select: { id: true, name: true, image: true },
@@ -61,8 +62,7 @@ export async function GET(
 
     const treeWithRelations = {
       ...tree,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      nodes: tree.nodes.map((node: any) => ({
+      nodes: tree.nodes.map((node) => ({
         ...node,
         outgoingEdges: node.outgoingEdges,
         incomingEdges: node.incomingEdges,
