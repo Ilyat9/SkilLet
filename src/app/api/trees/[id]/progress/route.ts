@@ -1,5 +1,6 @@
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
@@ -7,7 +8,14 @@ import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
+type RouteContext = { params: Promise<{ id: string }> }
+
+const ProgressSchema = z.object({
+  nodeId: z.string().min(1, 'nodeId обязателен'),
+  completed: z.boolean(),
+})
+
+export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -17,15 +25,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const { treeId, nodeId, completed } = body
+    const { id: treeId } = await params
 
-    if (!treeId || !nodeId || typeof completed !== 'boolean') {
+    const body = await request.json()
+    const validation = ProgressSchema.safeParse(body)
+
+    if (!validation.success) {
       return NextResponse.json(
-        createErrorResponse('Missing required fields', 'VALIDATION_ERROR'),
+        createErrorResponse(validation.error.errors[0]?.message ?? 'Ошибка валидации', 'VALIDATION_ERROR'),
         { status: 400 }
       )
     }
+
+    // treeId берём строго из URL — не доверяем body.
+    const { nodeId, completed } = validation.data
 
     const tree = await prisma.tree.findUnique({
       where: { id: treeId },

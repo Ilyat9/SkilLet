@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -10,51 +10,78 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
-  useReactFlow,
-  type Node,
   type Edge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { CustomNode } from './CustomNode'
-import { Node as PrismaNode, Edge as PrismaEdge } from '@prisma/client'
+import { CustomNode, type CustomFlowNode, type CustomNodeData } from './CustomNode'
+import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
+import type { Node as AppNode, Resource } from '@/entities/node/model/types'
+import type { NodeStatus } from '@/shared/constants'
+import type { Edge as PrismaEdge } from '@prisma/client'
+
+// Кастомный тип узла для nodeTypes (нужен для типизации ReactFlow)
+type FlowNode = CustomFlowNode
+
+const nodeTypes = { custom: CustomNode }
 
 interface SkillTreeViewerProps {
-  nodes: PrismaNode[]
+  nodes: AppNode[]
   edges: PrismaEdge[]
   completedNodeIds: Set<string>
   onNodeClick?: (nodeId: string) => void
   onResourceClick?: (nodeId: string, e: React.MouseEvent) => void
 }
 
+function toAppResources(resources: Resource[]): Resource[] {
+  return resources
+}
+
 export function SkillTreeViewer({
   nodes,
   edges,
-  completedNodeIds: _completedNodeIds,
-  onNodeClick: _onNodeClick,
-  onResourceClick: _onResourceClick,
+  completedNodeIds,
+  onNodeClick,
+  onResourceClick,
 }: SkillTreeViewerProps) {
-  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<Node>([])
+  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<FlowNode>([])
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState<Edge>([])
-  useReactFlow()
 
-  useEffect(() => {
-    const flowNodes = nodes.map((node) => ({
-      id: node.id,
-      type: 'custom',
-      position: { x: node.positionX, y: node.positionY },
-      data: {
-        ...node,
+  // Пересобираем flow-узлы при изменении дерева ИЛИ прогресса — статусы обновятся
+  const flowNodes = useMemo(() => {
+    return nodes.map((node): FlowNode => {
+      const status: NodeStatus = getNodeStatus(node, completedNodeIds)
+      const isLocked = status === 'locked'
+
+      const data: CustomNodeData = {
         title: node.title,
-        description: node.description,
+        description: node.description ?? undefined,
         difficulty: node.difficulty,
-      },
-    }))
+        treeId: node.treeId,
+        resources: toAppResources(node.resources),
+        status,
+        isInteractive: !isLocked,
+        onNodeClick: isLocked ? undefined : () => onNodeClick?.(node.id),
+        onResourceClick:
+          !isLocked && node.resources.length > 0
+            ? (e: React.MouseEvent) => onResourceClick?.(node.id, e)
+            : undefined,
+      }
 
-    setReactFlowNodes(flowNodes)
-  }, [nodes, setReactFlowNodes])
+      return {
+        id: node.id,
+        type: 'custom',
+        position: { x: node.positionX, y: node.positionY },
+        data,
+      }
+    })
+  }, [nodes, completedNodeIds, onNodeClick, onResourceClick])
 
   useEffect(() => {
-    const edgeConnections = edges.map((edge) => ({
+    setReactFlowNodes(flowNodes)
+  }, [flowNodes, setReactFlowNodes])
+
+  useEffect(() => {
+    const edgeConnections: Edge[] = edges.map((edge) => ({
       id: edge.id,
       source: edge.sourceId,
       target: edge.targetId,
@@ -64,27 +91,20 @@ export function SkillTreeViewer({
     setReactFlowEdges(edgeConnections)
   }, [edges, setReactFlowEdges])
 
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      setReactFlowEdges((eds) => addEdge(connection, eds))
-    },
-    [setReactFlowEdges]
-  )
-
   return (
-    <div className="w-full h-full" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="w-full h-full">
       <ReactFlowProvider>
         <ReactFlow
           nodes={reactFlowNodes}
           edges={reactFlowEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={{ custom: CustomNode }}
+          nodeTypes={nodeTypes}
           fitView
           nodesDraggable={false}
           nodesConnectable={false}
-          elementsSelectable={true}
+          elementsSelectable={false}
+          proOptions={{ hideAttribution: true }}
         >
           <Background />
           <MiniMap />

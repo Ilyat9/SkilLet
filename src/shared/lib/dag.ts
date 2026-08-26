@@ -1,4 +1,4 @@
-type Edge = { sourceId: string; targetId: string }
+type Edge = { sourceId: string; targetId: string; treeId: string }
 
 export function hasCycle(edges: Edge[], startId: string, targetId: string): boolean {
   const visited = new Set<string>()

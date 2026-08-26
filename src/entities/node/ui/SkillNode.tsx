@@ -10,8 +10,8 @@ interface SkillNodeProps {
   node: Node
   status: NodeStatus
   isInteractive?: boolean
-  onNodeClick?: () => void
-  onResourceClick?: (e: React.MouseEvent) => void
+  onNodeClick?: (() => void) | undefined
+  onResourceClick?: ((e: React.MouseEvent) => void) | undefined
 }
 
 export function SkillNode({ node, status, isInteractive = false, onNodeClick, onResourceClick }: SkillNodeProps) {

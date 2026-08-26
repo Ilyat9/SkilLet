@@ -18,6 +18,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Отдельный one-off сервис для миграций и сидирования БД.
+  # Выполняется в образе builder-стадии (с полными node_modules и prisma CLI),
+  # поэтому продовый runner остаётся минимальным.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: skillet-migrate
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/skillet
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma db push && npx prisma db seed"
+    restart: "no"
+
   app:
     build:
       context: .
@@ -34,7 +51,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma db push && npx prisma db seed && node server.js"
+      migrate:
+        condition: service_completed_successfully
+    command: node server.js
 
 volumes:
   postgres_data:

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect } from 'react'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { AuthButton } from '@/features/auth/ui/AuthButton'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -13,7 +13,12 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
-  useState(false)
+  // Навигация авторизованного пользователя — в эффекте, а не во время рендера.
+  useEffect(() => {
+    if (session) {
+      router.push(callbackUrl)
+    }
+  }, [session, callbackUrl, router])
 
   if (status === 'loading') {
     return (
@@ -24,7 +29,6 @@ export default function LoginPage() {
   }
 
   if (session) {
-    router.push(callbackUrl)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

@@ -35,4 +35,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["sh", "-c", "npx prisma db push && node server.js"]
+# Миграции БД (prisma db push / migrate deploy) выполняются отдельным шагом
+# CI/CD или сервисом-мигратором в docker-compose — НЕ в минимальном runner-образе.
+CMD ["node", "server.js"]

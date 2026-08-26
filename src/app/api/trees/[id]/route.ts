@@ -17,29 +17,21 @@ export async function GET(
     const session = await auth()
     const userId = session?.user?.id
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const include: any = {
-      _count: { select: { nodes: true } },
-      author: {
-        select: { id: true, name: true, image: true },
-      },
-      nodes: {
-        include: {
-          outgoingEdges: true,
-          incomingEdges: true,
-        },
-      },
-    }
-
-    if (userId) {
-      include.progresses = {
-        where: { userId },
-      }
-    }
-
     const tree = await prisma.tree.findUnique({
       where: { id: treeId },
-      include,
+      include: {
+        _count: { select: { nodes: true } },
+        author: {
+          select: { id: true, name: true, image: true },
+        },
+        nodes: {
+          include: {
+            outgoingEdges: true,
+            incomingEdges: true,
+          },
+        },
+        progresses: userId ? { where: { userId } } : false,
+      },
     })
 
     if (!tree) {
@@ -117,7 +109,7 @@ export async function PATCH(
 
     if (!validation.success) {
       return NextResponse.json(
-        createErrorResponse(validation.error.errors[0].message, 'VALIDATION_ERROR'),
+        createErrorResponse(validation.error.errors[0]?.message ?? 'Ошибка валидации', 'VALIDATION_ERROR'),
         { status: 400 }
       )
     }
@@ -126,7 +118,11 @@ export async function PATCH(
 
     const result = await prisma.tree.update({
       where: { id: treeId },
-      data: { title, description, isPublic },
+      data: {
+        ...(title !== undefined ? { title } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(isPublic !== undefined ? { isPublic } : {}),
+      },
     })
 
     return NextResponse.json(createSuccessResponse(result))

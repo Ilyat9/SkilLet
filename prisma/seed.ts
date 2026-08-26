@@ -1,17 +1,6 @@
-import 'server-only'
 import { PrismaClient } from '@prisma/client'
-import type { Prisma } from '@prisma/client'
-import { Node as PrismaNode } from '@prisma/client'
 
 const prisma = new PrismaClient()
-
-type TreeData = {
-  title: string
-  description: string
-  isPublic: boolean
-  authorId: string
-  nodes: NodeData[]
-}
 
 type NodeData = {
   title: string
@@ -19,41 +8,53 @@ type NodeData = {
   positionX: number
   positionY: number
   difficulty: number
-  resourceType?: string
+  resourceType?: 'video' | 'article'
   resourceUrl?: string
   resourceTitle?: string
 }
 
-function generateNodes(treeId: string, authorId: string): PrismaNode[] {
-  const nodes: PrismaNode[] = []
-  let nodeIdCounter = 0
+type EdgePair = [sourceIndex: number, targetIndex: number]
 
-  const createNode = (data: NodeData): PrismaNode => {
-    const node = {
-      id: `node-${treeId}-${nodeIdCounter++}`,
-      title: data.title,
-      description: data.description,
-      resources: data.resourceType ? [{ type: data.resourceType, url: data.resourceUrl!, title: data.resourceTitle! }] : [],
-      positionX: data.positionX,
-      positionY: data.positionY,
-      difficulty: data.difficulty,
-      treeId,
+type TreeSeed = {
+  key: string
+  title: string
+  description: string
+  isPublic: boolean
+  nodes: NodeData[]
+  /** Пары индексов [sourceIndex, targetIndex] по массиву nodes. */
+  connections: EdgePair[]
+}
+
+/**
+ * Строит данные узлов с детерминированными id. Связи строятся
+ * по индексам массива узлов, а не по хардкоду строковых id.
+ */
+function buildNodesData(treeKey: string, nodeDefs: NodeData[]) {
+  return nodeDefs.map((def, index) => {
+    const resources =
+      def.resourceType && def.resourceUrl && def.resourceTitle
+        ? [{ type: def.resourceType, url: def.resourceUrl, title: def.resourceTitle }]
+        : []
+
+    return {
+      id: `seed-${treeKey}-node-${index}`,
+      title: def.title,
+      description: def.description ?? null,
+      positionX: def.positionX,
+      positionY: def.positionY,
+      difficulty: def.difficulty,
+      resources,
     }
-    nodes.push(node)
-    return node
-  }
-
-  // Начальный узел
-  const startNode = createNode({
-    title: 'Начало',
-    description: 'Добро пожаловать в ваш первый навык',
-    positionX: 0,
-    positionY: -150,
-    difficulty: 1,
   })
+}
 
-  // Основной путь: 16 узлов для Frontend разработчика
-  const frontendPath = [
+const frontendTree: TreeSeed = {
+  key: 'frontend',
+  title: 'Frontend Разработчик',
+  description: 'Полный путь от основ до продакшена',
+  isPublic: true,
+  nodes: [
+    { title: 'Начало', description: 'Добро пожаловать в ваш первый навык', positionX: 0, positionY: -150, difficulty: 1 },
     { title: 'HTML & CSS Базовый', positionX: 0, positionY: -50, difficulty: 1, resourceType: 'article', resourceUrl: 'https://developer.mozilla.org/ru/docs/Web/HTML', resourceTitle: 'MDN: HTML' },
     { title: 'Вёрстка с Flexbox', positionX: 100, positionY: -50, difficulty: 2, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=zw8dLx1D9Uw', resourceTitle: 'Flexbox Froggy' },
     { title: 'Вёрстка с Grid', positionX: 200, positionY: -50, difficulty: 2, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=QAxZxOJ09-Y', resourceTitle: 'Grid Masterclass' },
@@ -69,77 +70,40 @@ function generateNodes(treeId: string, authorId: string): PrismaNode[] {
     { title: 'Базовый Routing', positionX: 600, positionY: 250, difficulty: 6, resourceType: 'article', resourceUrl: 'https://nextjs.org/docs/routing/introduction', resourceTitle: 'Next.js Routing' },
     { title: 'Tailwind CSS', positionX: 700, positionY: 250, difficulty: 2, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=Q8xrEgnh77I', resourceTitle: 'Tailwind CSS Basics' },
     { title: 'CI/CD Pipeline', positionX: 600, positionY: 350, difficulty: 7, resourceType: 'article', resourceUrl: 'https://vercel.com/docs/concepts/deployments/overview', resourceTitle: 'Vercel Deployment' },
-    { title: 'Заключение', positionX: 700, positionY: 350, description: 'Вы изучили основы Frontend разработки!', positionY: 450, difficulty: 10, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=6B8vcbsJIsM', resourceTitle: 'Frontend Roadmap' },
-  ]
-
-  const skillPath = [
-    { title: 'Командная работа', positionX: 0, positionY: 0, difficulty: 1 },
-    { title: 'Git базовый', positionX: 100, positionY: 0, difficulty: 2 },
-    { title: 'CI/CD', positionX: 200, positionY: 0, difficulty: 3 },
-    { title: 'Code Review', positionX: 100, positionY: 100, difficulty: 3 },
-    { title: 'Code Quality', positionX: 200, positionY: 100, difficulty: 4 },
-  ]
-
-  const collaborationPath = [
-    { title: 'Знакомство', positionX: 0, positionY: -150, difficulty: 1 },
-    { title: 'Коммуникация', positionX: 0, positionY: -50, difficulty: 2 },
-    { title: 'Обратная связь', positionX: 100, positionY: -50, difficulty: 2 },
-    { title: 'Дедлайны', positionX: 100, positionY: 50, difficulty: 3 },
-    { title: 'Team Lead', positionX: 100, positionY: 150, difficulty: 10 },
-  ]
-
-  frontendPath.forEach((nodeData) => createNode(nodeData))
-  skillPath.forEach((nodeData) => createNode(nodeData))
-  collaborationPath.forEach((nodeData) => createNode(nodeData))
-
-  return nodes
+    // В исходном литерале был дублирующийся positionY — оставлено одно корректное значение (450).
+    { title: 'Заключение', positionX: 700, positionY: 450, description: 'Вы изучили основы Frontend разработки!', difficulty: 10, resourceType: 'video', resourceUrl: 'https://www.youtube.com/watch?v=6B8vcbsJIsM', resourceTitle: 'Frontend Roadmap' },
+  ],
+  connections: [
+    [0, 1], [0, 4], [0, 16],
+    [1, 3], [3, 5],
+    [4, 3], [4, 5], [4, 7], [4, 10], [4, 14],
+    [5, 6], [6, 7], [7, 8], [8, 9], [9, 10],
+    [10, 12], [10, 14], [11, 12], [12, 13], [13, 14], [14, 16],
+  ],
 }
 
-function generateEdges(treeId: string, nodes: PrismaNode[]): PrismaEdge[] {
-  const edges: PrismaEdge[] = []
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]))
-
-  const createEdge = (sourceId: string, targetId: string) => {
-    edges.push({
-      id: `edge-${sourceId}-${targetId}`,
-      treeId,
-      sourceId,
-      targetId,
-    })
-  }
-
-  const connections: Record<string, string[]> = {
-    'node-skillet-start-0': [
-      'node-skillet-start-1',
-      'node-skillet-start-4',
-      'node-skillet-start-16',
-    ],
-    'node-skillet-start-1': ['node-skillet-start-3'],
-    'node-skillet-start-3': ['node-skillet-start-5'],
-    'node-skillet-start-4': ['node-skillet-start-7', 'node-skillet-start-10'],
-    'node-skillet-start-5': ['node-skillet-start-6'],
-    'node-skillet-start-6': ['node-skillet-start-7'],
-    'node-skillet-start-7': ['node-skillet-start-8', 'node-skillet-start-11'],
-    'node-skillet-start-8': ['node-skillet-start-9'],
-    'node-skillet-start-9': ['node-skillet-start-10'],
-    'node-skillet-start-10': ['node-skillet-start-12', 'node-skillet-start-14'],
-    'node-skillet-start-11': ['node-skillet-start-12'],
-    'node-skillet-start-12': ['node-skillet-start-13'],
-    'node-skillet-start-13': ['node-skillet-start-14'],
-    'node-skillet-start-14': ['node-skillet-start-16'],
-    'node-skillet-start-16': ['node-skillet-start-17'],
-    'node-skillet-start-4': ['node-skillet-start-3', 'node-skillet-start-5', 'node-skillet-start-10', 'node-skillet-start-14'],
-  }
-
-  Object.entries(connections).forEach(([sourceId, targets]) => {
-    targets.forEach((targetId) => {
-      if (nodeMap.has(sourceId) && nodeMap.has(targetId)) {
-        createEdge(sourceId, targetId)
-      }
-    })
-  })
-
-  return edges
+const softSkillsTree: TreeSeed = {
+  key: 'softskills',
+  title: 'Soft Skills',
+  description: 'Навыки для эффективной работы в команде',
+  isPublic: true,
+  nodes: [
+    { title: 'Знакомство', positionX: 0, positionY: -150, difficulty: 1 },
+    { title: 'Командная работа', positionX: 0, positionY: -50, difficulty: 1 },
+    { title: 'Git базовый', positionX: 100, positionY: -50, difficulty: 2 },
+    { title: 'Коммуникация', positionX: 0, positionY: 50, difficulty: 2 },
+    { title: 'CI/CD', positionX: 200, positionY: -50, difficulty: 3 },
+    { title: 'Code Review', positionX: 100, positionY: 50, difficulty: 3 },
+    { title: 'Обратная связь', positionX: 100, positionY: 150, difficulty: 2 },
+    { title: 'Code Quality', positionX: 200, positionY: 50, difficulty: 4 },
+    { title: 'Дедлайны', positionX: 100, positionY: 250, difficulty: 3 },
+    { title: 'Team Lead', positionX: 100, positionY: 350, difficulty: 10 },
+  ],
+  connections: [
+    [0, 1], [1, 2], [1, 3],
+    [2, 4], [2, 5], [3, 6],
+    [4, 7], [5, 7], [6, 8], [7, 9], [8, 9],
+  ],
 }
 
 async function main() {
@@ -157,76 +121,101 @@ async function main() {
 
   console.log('👤 Создан пользователь:', author.name)
 
-  const frontendTree = {
-    title: 'Frontend Разработчик',
-    description: 'Полный путь от основ до продакшена',
-    isPublic: true,
-    authorId: author.id,
-    nodes: generateNodes(`skillet-${author.id}-frontend`, author.id),
+  const treesToSeed = [frontendTree, softSkillsTree]
+
+  let totalNodesCreated = 0
+  let totalEdgesCreated = 0
+
+  for (const treeSeed of treesToSeed) {
+    const nodesData = buildNodesData(treeSeed.key, treeSeed.nodes)
+
+    await prisma.$transaction(async (tx) => {
+      console.log(`🌳 Создание дерева «${treeSeed.title}»...`)
+
+      // Вложенный create: Prisma сам подставит treeId для узлов.
+      const tree = await tx.tree.create({
+        data: {
+          title: treeSeed.title,
+          description: treeSeed.description,
+          isPublic: treeSeed.isPublic,
+          authorId: author.id,
+          nodes: { create: nodesData },
+        },
+        include: { nodes: true },
+      })
+
+      // Маппинг индекс → реальный id из БД.
+      const idByIndex = new Map<number, string>()
+      for (let index = 0; index < nodesData.length; index += 1) {
+        const createdNode = tree.nodes.find((n) => n.id === nodesData[index]?.id)
+        if (!createdNode) {
+          throw new Error(`Узел с id ${nodesData[index]?.id} не найден после создания дерева`)
+        }
+        idByIndex.set(index, createdNode.id)
+      }
+
+      const edgesData = treeSeed.connections
+        .map(([sourceIndex, targetIndex]) => {
+          const sourceId = idByIndex.get(sourceIndex)
+          const targetId = idByIndex.get(targetIndex)
+          if (!sourceId || !targetId) {
+            throw new Error(
+              `Связь [${sourceIndex}, ${targetIndex}] ссылается на несуществующий узел дерева «${treeSeed.title}»`
+            )
+          }
+          return { treeId: tree.id, sourceId, targetId }
+        })
+
+      if (edgesData.length > 0) {
+        await tx.edge.createMany({ data: edgesData })
+      }
+
+      // Прогресс по первому узлу frontend-дерева.
+      if (treeSeed.key === 'frontend') {
+        const firstNodeId = idByIndex.get(0)
+        if (!firstNodeId) {
+          throw new Error('Первый узел frontend-дерева не найден — невозможно создать прогресс')
+        }
+        await tx.userProgress.create({
+          data: {
+            userId: author.id,
+            treeId: tree.id,
+            nodeId: firstNodeId,
+            completed: true,
+            completedAt: new Date(),
+          },
+        })
+        console.log('🎯 Создан начальный прогресс для первого узла')
+      }
+
+      totalNodesCreated += tree.nodes.length
+      totalEdgesCreated += edgesData.length
+
+      console.log(
+        `✅ «${tree.title}»: узлов=${tree.nodes.length}, связей=${edgesData.length}`
+      )
+    })
   }
 
-  const collaborationTree = {
-    title: 'Soft Skills',
-    description: 'Навыки для эффективной работы в команде',
-    isPublic: true,
-    authorId: author.id,
-    nodes: generateNodes(`skillet-${author.id}-softskills`, author.id),
-  }
-
-  const myTree = {
-    title: 'Мои навыки',
-    description: 'Ваши деревья навыков появятся здесь',
-    isPublic: false,
-    authorId: author.id,
-    nodes: [],
-  }
-
-  await prisma.$transaction(async (tx) => {
-    console.log('🌳 Создание деревьев...')
-
-    const frontend = await tx.tree.create({
-      data: frontendTree,
-    })
-
-    const collaboration = await tx.tree.create({
-      data: collaborationTree,
-    })
-
-    const my = await tx.tree.create({
-      data: myTree,
-    })
-
-    console.log('✅ Созданы деревья:', frontend.title, collaboration.title, my.title)
-
-    console.log('🔗 Создание связей...')
-
-    const frontendNodes = await tx.node.findMany({ where: { treeId: frontend.id } })
-    const frontendEdges = generateEdges(frontend.id, frontendNodes)
-
-    const collaborationNodes = await tx.node.findMany({ where: { treeId: collaboration.id } })
-    const collaborationEdges = generateEdges(collaboration.id, collaborationNodes)
-
-    await tx.edge.createMany({ data: frontendEdges })
-    await tx.edge.createMany({ data: collaborationEdges })
-
-    console.log('✅ Созданы связи:', frontendEdges.length, 'для', frontend.title, collaborationEdges.length, 'для', collaboration.title)
-
-    console.log('🎯 Создание прогресса для первого дерева...')
-    const firstNode = frontendNodes[0]
-    await tx.userProgress.create({
-      data: {
-        userId: author.id,
-        treeId: frontend.id,
-        nodeId: firstNode.id,
-        completed: true,
-        completedAt: new Date(),
-      },
-    })
-
-    console.log('✅ Создан начальный прогресс для', frontend.title)
+  // Публичное пустое дерево-пример.
+  await prisma.tree.create({
+    data: {
+      title: 'Мои навыки',
+      description: 'Ваши деревья навыков появятся здесь',
+      isPublic: false,
+      authorId: author.id,
+    },
   })
 
+  // Финальная верификация.
+  const [nodeCount, edgeCount] = await Promise.all([
+    prisma.node.count(),
+    prisma.edge.count(),
+  ])
+
   console.log('🎉 Seed завершён успешно!')
+  console.log(`📊 Всего в БД: узлов=${nodeCount}, рёбер=${edgeCount}`)
+  console.log(`📊 Создано за прогон: узлов=${totalNodesCreated}, рёбер=${totalEdgesCreated}`)
 }
 
 main()

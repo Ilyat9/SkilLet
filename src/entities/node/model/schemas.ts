@@ -1,4 +1,22 @@
 import { z } from 'zod'
+import type { Resource } from './types'
+
+const resourceObjectSchema = z.object({
+  type: z.enum(['video', 'article']),
+  url: z.string().url(),
+  title: z.string(),
+})
+
+export const ResourcesSchema = z.array(resourceObjectSchema)
+
+/**
+ * Ресурсы хранятся в Prisma как Json — приводим их к Resource[]
+ * с рантайм-валидацией через zod. Невалидные значения дают пустой массив.
+ */
+export function parseResources(value: unknown): Resource[] {
+  const result = ResourcesSchema.safeParse(value)
+  return result.success ? result.data : []
+}
 
 export const NodeSchema = z.object({
   title: z.string().min(1, 'Название обязательно').max(200, 'Слишком длинное название'),

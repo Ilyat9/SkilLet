@@ -26,7 +26,7 @@ export default function DashboardPage() {
   const fetchTrees = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/trees?isPublic=false')
+      const response = await fetch('/api/trees?scope=mine')
       const result = await response.json()
       if (result.data) {
         setTrees(result.data)

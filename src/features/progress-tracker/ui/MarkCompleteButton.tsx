@@ -11,11 +11,12 @@ import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface MarkCompleteButtonProps {
   node: Node
+  completedNodeIds: Set<string>
   isCompleted: boolean
   onToggle: (completed: boolean) => void
 }
 
-export function MarkCompleteButton({ node, isCompleted, onToggle }: MarkCompleteButtonProps) {
+export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onToggle }: MarkCompleteButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const { data: session } = useAuth()
 
@@ -26,11 +27,11 @@ export function MarkCompleteButton({ node, isCompleted, onToggle }: MarkComplete
   const handleMarkComplete = async () => {
     setIsLoading(true)
     try {
+      // treeId не передаём в body — сервер берёт его из URL.
       const response = await fetch(`/api/trees/${node.treeId}/progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          treeId: node.treeId,
           nodeId: node.id,
           completed: !isCompleted,
         }),
@@ -60,7 +61,7 @@ export function MarkCompleteButton({ node, isCompleted, onToggle }: MarkComplete
     )
   }
 
-  const status = getNodeStatus(node, new Set())
+  const status = getNodeStatus(node, completedNodeIds)
 
   if (status === NODE_STATUS.LOCKED) {
     return (

@@ -11,16 +11,36 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const treeId = searchParams.get('treeId')
-    const isPublic = searchParams.get('isPublic') === 'true'
+    const scope = searchParams.get('scope')
 
-    await auth()
+    // Листинг возможен ТОЛЬКО в явном режиме: публичные деревья или «мои деревья».
+    if (scope !== 'public' && scope !== 'mine') {
+      return NextResponse.json(
+        createErrorResponse(
+          "Query parameter 'scope' is required and must be 'public' or 'mine'",
+          'VALIDATION_ERROR'
+        ),
+        { status: 400 }
+      )
+    }
+
+    let where: { isPublic?: boolean; authorId?: string }
+
+    if (scope === 'mine') {
+      const session = await auth()
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
+          { status: 401 }
+        )
+      }
+      where = { authorId: session.user.id }
+    } else {
+      where = { isPublic: true }
+    }
 
     const trees = await prisma.tree.findMany({
-      where: {
-        ...(isPublic ? { isPublic: true } : {}),
-        ...(treeId ? { id: treeId } : {}),
-      },
+      where,
       include: {
         _count: { select: { nodes: true } },
         author: {
@@ -57,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        createErrorResponse(validation.error.errors[0].message, 'VALIDATION_ERROR'),
+        createErrorResponse(validation.error.errors[0]?.message ?? 'Ошибка валидации', 'VALIDATION_ERROR'),
         { status: 400 }
       )
     }
@@ -68,8 +88,8 @@ export async function POST(request: NextRequest) {
       const tree = await tx.tree.create({
         data: {
           title,
-          description,
-          isPublic,
+          ...(description !== undefined ? { description } : {}),
+          ...(isPublic !== undefined ? { isPublic } : {}),
           authorId: session.user.id,
         },
       })

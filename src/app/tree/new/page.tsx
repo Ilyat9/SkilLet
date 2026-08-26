@@ -5,15 +5,19 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/shared/ui/Button'
 import { Modal } from '@/shared/ui/Modal'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { TEMPLATES, type SkillTemplate } from '@/shared/constants/templates'
+import { Loader2, ArrowLeft, Sparkles } from 'lucide-react'
 
 export default function NewTreePage() {
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleCreate = async () => {
     setIsCreating(true)
+    setError(null)
     try {
       const response = await fetch('/api/trees', {
         method: 'POST',
@@ -27,16 +31,81 @@ export default function NewTreePage() {
 
       const result = await response.json()
       if (result.error) {
-        alert(result.error.message)
+        setError(result.error.message)
         return
       }
 
       router.push(`/tree/${result.data.id}`)
-    } catch (error) {
-      console.error('Ошибка создания дерева:', error)
-      alert('Ошибка создания дерева')
+    } catch (err) {
+      console.error('Ошибка создания дерева:', err)
+      setError('Ошибка создания дерева')
     } finally {
       setIsCreating(false)
+    }
+  }
+
+  /** Создаёт дерево из шаблона: Tree → Nodes[] → Edges[] через CRUD API. */
+  const handleCreateFromTemplate = async (template: SkillTemplate) => {
+    setCreatingTemplateId(template.id)
+    setError(null)
+    try {
+      // 1. Создаём дерево
+      const treeResponse = await fetch('/api/trees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: template.title,
+          description: template.description,
+          isPublic: false,
+        }),
+      })
+      const treeResult = await treeResponse.json()
+      if (treeResult.error) {
+        setError(treeResult.error.message)
+        return
+      }
+      const treeId: string = treeResult.data.id
+
+      // 2. Создаём узлы, запоминая id по индексам шаблона
+      const createdNodeIds: string[] = []
+      for (const node of template.nodes) {
+        const nodeResponse = await fetch(`/api/trees/${treeId}/nodes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(node),
+        })
+        const nodeResult = await nodeResponse.json()
+        if (nodeResult.error) {
+          setError(nodeResult.error.message)
+          router.push(`/tree/${treeId}`)
+          return
+        }
+        createdNodeIds.push(nodeResult.data.id as string)
+      }
+
+      // 3. Создаём рёбра по парам индексов
+      for (const [sourceIndex, targetIndex] of template.connections) {
+        const sourceId = createdNodeIds[sourceIndex]
+        const targetId = createdNodeIds[targetIndex]
+        if (!sourceId || !targetId) continue
+
+        const edgeResponse = await fetch(`/api/trees/${treeId}/edges`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceId, targetId }),
+        })
+        const edgeResult = await edgeResponse.json()
+        if (edgeResult.error) {
+          console.error('Ошибка создания связи:', edgeResult.error.message)
+        }
+      }
+
+      router.push(`/tree/${treeId}`)
+    } catch (err) {
+      console.error('Ошибка создания дерева из шаблона:', err)
+      setError('Ошибка создания дерева из шаблона')
+    } finally {
+      setCreatingTemplateId(null)
     }
   }
 
@@ -99,6 +168,8 @@ export default function NewTreePage() {
         </div>
       </div>
 
+      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -108,19 +179,30 @@ export default function NewTreePage() {
           <p className="text-gray-400 text-sm">
             Выберите шаблон для быстрого старта. Шаблоны уже содержат структурированные навыки.
           </p>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="grid grid-cols-1 gap-3">
-            <div className="p-4 bg-card border border-border rounded-lg hover:border-primary cursor-pointer transition-colors">
-              <h4 className="font-semibold">Frontend Разработчик</h4>
-              <p className="text-sm text-gray-400">HTML, CSS, JavaScript, React, Next.js, TypeScript</p>
-            </div>
-            <div className="p-4 bg-card border border-border rounded-lg hover:border-primary cursor-pointer transition-colors">
-              <h4 className="font-semibold">Backend Разработчик</h4>
-              <p className="text-sm text-gray-400">Node.js, Python, PostgreSQL, REST API</p>
-            </div>
-            <div className="p-4 bg-card border border-border rounded-lg hover:border-primary cursor-pointer transition-colors">
-              <h4 className="font-semibold">Data Scientist</h4>
-              <p className="text-sm text-gray-400">Python, NumPy, Pandas, Scikit-learn</p>
-            </div>
+            {TEMPLATES.map((template) => {
+              const isCreatingThis = creatingTemplateId === template.id
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  disabled={creatingTemplateId !== null}
+                  onClick={() => void handleCreateFromTemplate(template)}
+                  className="text-left p-4 bg-card border border-border rounded-lg hover:border-primary cursor-pointer transition-colors disabled:opacity-60"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold">{template.title}</h4>
+                    {isCreatingThis ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-400">{template.description}</p>
+                </button>
+              )
+            })}
           </div>
         </div>
       </Modal>

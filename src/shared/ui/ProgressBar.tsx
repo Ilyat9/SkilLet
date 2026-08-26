@@ -1,3 +1,5 @@
+import { cn } from '@/shared/lib/utils'
+
 interface ProgressBarProps {
   value: number
   max?: number
@@ -5,7 +7,7 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ value, max = 100, size = 'md' }: ProgressBarProps) {
-  const percentage = Math.min((value / max) * 100, 100)
+  const percentage = max === 0 ? 0 : Math.min((value / max) * 100, 100)
   const filled = percentage
 
   return (
