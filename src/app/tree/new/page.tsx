@@ -6,18 +6,33 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/shared/ui/Button'
 import { Modal } from '@/shared/ui/Modal'
 import { TEMPLATES, type SkillTemplate } from '@/shared/constants/templates'
+import { cn } from '@/shared/lib/utils'
 import { Loader2, ArrowLeft, Sparkles } from 'lucide-react'
+
+type CreateMode = 'templates' | 'ai'
 
 export default function NewTreePage() {
   const router = useRouter()
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
-  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<CreateMode>('templates')
 
-  const handleCreate = async () => {
-    setIsCreating(true)
-    setError(null)
+  // Общее состояние «создать пустое дерево»
+  const [isCreatingEmpty, setIsCreatingEmpty] = useState(false)
+  const [emptyError, setEmptyError] = useState<string | null>(null)
+
+  // Состояние создания из шаблона
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null)
+  const [templateError, setTemplateError] = useState<string | null>(null)
+
+  // Состояние AI-генерации
+  const [topic, setTopic] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  /** Создаёт ПУСТОЕ дерево и переходит в редактор. */
+  const handleCreateEmpty = async () => {
+    setIsCreatingEmpty(true)
+    setEmptyError(null)
     try {
       const response = await fetch('/api/trees', {
         method: 'POST',
@@ -31,81 +46,79 @@ export default function NewTreePage() {
 
       const result = await response.json()
       if (result.error) {
-        setError(result.error.message)
+        setEmptyError(result.error.message)
         return
       }
 
       router.push(`/tree/${result.data.id}`)
     } catch (err) {
       console.error('Ошибка создания дерева:', err)
-      setError('Ошибка создания дерева')
+      setEmptyError('Ошибка создания дерева')
     } finally {
-      setIsCreating(false)
+      setIsCreatingEmpty(false)
     }
   }
 
-  /** Создаёт дерево из шаблона: Tree → Nodes[] → Edges[] через CRUD API. */
+  /**
+   * Создаёт РЕАЛЬНОЕ дерево из шаблона ОДНИМ запросом:
+   * POST /api/trees/from-template сохраняет Tree + Nodes[] + Edges[]
+   * единой транзакцией на сервере (паттерн prisma/seed.ts),
+   * владелец — текущий авторизованный пользователь.
+   */
   const handleCreateFromTemplate = async (template: SkillTemplate) => {
     setCreatingTemplateId(template.id)
-    setError(null)
+    setTemplateError(null)
     try {
-      // 1. Создаём дерево
-      const treeResponse = await fetch('/api/trees', {
+      const response = await fetch('/api/trees/from-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: template.title,
           description: template.description,
           isPublic: false,
+          nodes: template.nodes,
+          connections: template.connections,
         }),
       })
-      const treeResult = await treeResponse.json()
-      if (treeResult.error) {
-        setError(treeResult.error.message)
+      const result = await response.json()
+      if (result.error) {
+        setTemplateError(result.error.message)
         return
       }
-      const treeId: string = treeResult.data.id
-
-      // 2. Создаём узлы, запоминая id по индексам шаблона
-      const createdNodeIds: string[] = []
-      for (const node of template.nodes) {
-        const nodeResponse = await fetch(`/api/trees/${treeId}/nodes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(node),
-        })
-        const nodeResult = await nodeResponse.json()
-        if (nodeResult.error) {
-          setError(nodeResult.error.message)
-          router.push(`/tree/${treeId}`)
-          return
-        }
-        createdNodeIds.push(nodeResult.data.id as string)
-      }
-
-      // 3. Создаём рёбра по парам индексов
-      for (const [sourceIndex, targetIndex] of template.connections) {
-        const sourceId = createdNodeIds[sourceIndex]
-        const targetId = createdNodeIds[targetIndex]
-        if (!sourceId || !targetId) continue
-
-        const edgeResponse = await fetch(`/api/trees/${treeId}/edges`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceId, targetId }),
-        })
-        const edgeResult = await edgeResponse.json()
-        if (edgeResult.error) {
-          console.error('Ошибка создания связи:', edgeResult.error.message)
-        }
-      }
-
-      router.push(`/tree/${treeId}`)
+      router.push(`/tree/${result.data.id}`)
     } catch (err) {
-      console.error('Ошибка создания дерева из шаблона:', err)
-      setError('Ошибка создания дерева из шаблона')
+      console.error('Ошибка импорта шаблона:', err)
+      setTemplateError('Ошибка импорта шаблона')
     } finally {
       setCreatingTemplateId(null)
+    }
+  }
+
+  /** Генерирует дерево по теме через LLM и переходит к созданному дереву. */
+  const handleGenerate = async () => {
+    if (topic.trim().length < 3) {
+      setAiError('Опишите тему хотя бы в 3 символах')
+      return
+    }
+    setIsGenerating(true)
+    setAiError(null)
+    try {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: topic.trim() }),
+      })
+      const result = await response.json()
+      if (result.error) {
+        setAiError(result.error.message)
+        return
+      }
+      router.push(`/tree/${result.data.treeId}`)
+    } catch (err) {
+      console.error('Ошибка AI-генерации:', err)
+      setAiError('Ошибка AI-генерации. Попробуйте ещё раз.')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -128,58 +141,110 @@ export default function NewTreePage() {
             </p>
           </div>
 
-          <p className="text-gray-500 mb-6 text-sm">
-            Платформа SkilLet позволяет создавать интерактивные деревья навыков в формате RPG.
-            Вы можете начинать с пустого дерева или выбрать существующее как шаблон.
-          </p>
+          {/* Вкладки способа создания */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-secondary rounded-lg mb-6" role="tablist">
+            {(
+              [
+                { id: 'templates', label: 'Шаблоны' },
+                { id: 'ai', label: 'AI-генерация' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={mode === tab.id}
+                onClick={() => setMode(tab.id)}
+                className={cn(
+                  'py-2 px-3 rounded-md text-sm font-medium transition-colors',
+                  mode === tab.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-gray-400 hover:text-foreground'
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
+          {/* Панель «создать пустое дерево» — доступна из обеих вкладок */}
           <div className="space-y-3">
-            <Button
-              onClick={handleCreate}
-              disabled={isCreating}
-              className="w-full"
-              size="lg"
-            >
-              {isCreating ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              ) : null}
+            <Button onClick={handleCreateEmpty} disabled={isCreatingEmpty} className="w-full" size="lg">
+              {isCreatingEmpty ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
               Создать пустое дерево
             </Button>
 
-            <Button
-              onClick={() => setIsModalOpen(true)}
-              variant="secondary"
-              className="w-full"
-              size="lg"
-            >
-              Создать из шаблона
-            </Button>
+            {mode === 'templates' ? (
+              <Button
+                onClick={() => setIsTemplateModalOpen(true)}
+                variant="secondary"
+                className="w-full"
+                size="lg"
+              >
+                Выбрать шаблон
+              </Button>
+            ) : (
+              <div className="space-y-3 pt-2 border-t border-border mt-4">
+                <label htmlFor="ai-topic" className="block text-sm font-medium">
+                  Тема обучения
+                </label>
+                <textarea
+                  id="ai-topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Например: изучение Rust с нуля до написания CLI-приложений"
+                  rows={3}
+                  maxLength={200}
+                  disabled={isGenerating}
+                  className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 resize-none"
+                />
+                <Button
+                  onClick={() => void handleGenerate()}
+                  disabled={isGenerating || topic.trim().length < 3}
+                  variant="secondary"
+                  className="w-full"
+                  size="lg"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Генерируем дерево (до ~30 сек)…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2 text-primary" />
+                      Сгенерировать AI-деревом по теме
+                    </>
+                  )}
+                </Button>
+                {isGenerating && (
+                  <p className="text-xs text-gray-500 text-center">
+                    Модель придумает 8–20 узлов со связями и ресурсами — останется только учиться.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="mt-6 p-4 bg-secondary rounded-lg">
-            <h3 className="font-semibold mb-2 text-sm">Что вы хотите создать?</h3>
-            <ul className="text-sm text-gray-400 space-y-2">
-              <li>• Frontend разработка</li>
-              <li>• Backend разработка</li>
-              <li>• DevOps и Kubernetes</li>
-              <li>• AI & Machine Learning</li>
-            </ul>
-          </div>
+          {(emptyError || aiError) && (
+            <div className="mt-4 p-3 bg-red-950/40 border border-red-800/50 rounded-lg">
+              <p className="text-red-400 text-sm">{emptyError ?? aiError}</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
         title="Создать из шаблона"
       >
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
-            Выберите шаблон для быстрого старта. Шаблоны уже содержат структурированные навыки.
+            Выберите шаблон для быстрого старта. Дерево создастся полностью — с узлами и связями,
+            и будет принадлежать вам.
           </p>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {templateError && <p className="text-red-400 text-sm">{templateError}</p>}
           <div className="grid grid-cols-1 gap-3">
             {TEMPLATES.map((template) => {
               const isCreatingThis = creatingTemplateId === template.id

@@ -10,6 +10,9 @@ export interface Tree {
   authorId: string
   _count?: {
     nodes: number
+    /** Завершённые UserProgress — метрика популярности (приходит из GET /api/trees). */
+    progresses?: number
+    edges?: number
   }
   author?: {
     id: string

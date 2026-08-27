@@ -42,7 +42,14 @@ export async function GET(request: NextRequest) {
     const trees = await prisma.tree.findMany({
       where,
       include: {
-        _count: { select: { nodes: true } },
+        _count: {
+          select: {
+            nodes: true,
+            // Популярность дерева по ТЗ: количество UserProgress с completed=true.
+            progresses: { where: { completed: true } },
+            edges: true,
+          },
+        },
         author: {
           select: { id: true, name: true, image: true },
         },

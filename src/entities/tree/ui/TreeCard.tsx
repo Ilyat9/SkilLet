@@ -40,7 +40,7 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect }: TreeCardProps)
         </p>
       )}
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         {isPublic ? (
           <Badge variant="success">Публичное</Badge>
         ) : (
@@ -49,6 +49,11 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect }: TreeCardProps)
         <span className="text-gray-500 text-sm">
           {tree._count?.nodes || 0} навыков
         </span>
+        {(tree._count?.progresses ?? 0) > 0 && (
+          <span className="text-orange-400 text-sm flex items-center gap-1" title="Сколько раз узлы дерева отмечены пройденными">
+            🔥 {tree._count?.progresses}
+          </span>
+        )}
       </div>
 
       {onSelect && (
