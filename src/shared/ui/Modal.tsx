@@ -39,14 +39,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Фон-скримин: декоративный, клик закрывает. */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-black/50 animate-overlay-in" onClick={onClose} aria-hidden />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-lg focus:outline-none"
+        className="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-lg focus:outline-none animate-modal-in"
       >
         {title && (
           <div className="flex items-center justify-between p-4 border-b border-border">

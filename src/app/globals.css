@@ -117,9 +117,92 @@ body {
   background: var(--background);
 }
 
+/* ---------- Микро-анимации (без framer-motion, чистый CSS) ---------- */
+
+@keyframes skillet-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes skillet-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes skillet-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skillet-sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes skillet-achievement-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.06);
+  }
+  70% {
+    transform: scale(0.99);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Появление тостов (slide-in справа). */
+  .animate-toast-in {
+    animation: skillet-toast-in 0.2s ease-out;
+  }
+
+  /* Открытие модалки (fade + scale). */
+  .animate-modal-in {
+    animation: skillet-modal-in 0.18s ease-out;
+  }
+
+  .animate-overlay-in {
+    animation: skillet-overlay-in 0.15s ease-out;
+  }
+
+  /* Выезд bottom-sheet drawer'а. */
+  .animate-sheet-up {
+    animation: skillet-sheet-up 0.22s ease-out;
+  }
+
+  /* Разовое заметное «спульсирующее» появление разблокированного достижения. */
+  .animate-achievement-pulse {
+    animation: skillet-achievement-pulse 0.7s ease-out;
   }
 }
 

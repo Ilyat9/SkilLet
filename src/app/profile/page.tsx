@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { ACHIEVEMENT_DEFS, type AchievementDef } from '@/shared/lib/gamification'
 import { Badge } from '@/shared/ui/Badge'
-import { Loader2, Flame, CheckCircle2, TreePine, Trophy } from 'lucide-react'
+import { Flame, CheckCircle2, TreePine, Trophy } from 'lucide-react'
 
 interface ProfileApiResponse {
   user: {
@@ -69,9 +69,27 @@ export default function ProfilePage() {
   }, [status, router])
 
   if (status === 'loading' || (isLoading && !profile && !error)) {
+    /* Skeleton профиля: шапка + карточки статистики — согласован со структурой страницы. */
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background" role="status" aria-label="Загрузка профиля">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-muted animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-7 w-48 rounded bg-muted animate-pulse" />
+              <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-4 space-y-2 animate-pulse">
+                <div className="h-5 w-5 rounded bg-muted" />
+                <div className="h-7 w-10 rounded bg-muted" />
+                <div className="h-3 w-20 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }

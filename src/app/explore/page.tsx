@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { TreeCard } from '@/entities/tree/ui/TreeCard'
 import type { Tree } from '@/entities/tree/model/types'
 import { Button } from '@/shared/ui/Button'
-import { Loader2, Search, Compass } from 'lucide-react'
+import { EmptyState } from '@/shared/ui/EmptyState'
+import { Search, Compass, AlertTriangle, SearchX } from 'lucide-react'
 
 type SortMode = 'newest' | 'popular'
 
@@ -108,33 +109,34 @@ export default function ExplorePage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          /* Skeleton карточек вместо спиннера. */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" role="status" aria-label="Загрузка каталога">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-6 space-y-4 animate-pulse">
+                <div className="flex items-start justify-between">
+                  <div className="h-6 w-32 rounded bg-muted" />
+                  <div className="h-4 w-20 rounded bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-3 w-3/4 rounded bg-muted" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="text-center py-12">
-            <h2 className="text-xl font-semibold mb-2">Ошибка загрузки</h2>
-            <p className="text-muted-foreground">{error}</p>
-          </div>
+          <EmptyState icon={AlertTriangle} title="Ошибка загрузки" description={error} />
         ) : visibleTrees.length === 0 ? (
-          /* Empty state: без данных вообще либо ничего не найдено по фильтру */
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-card border border-border rounded-full flex items-center justify-center mx-auto mb-4">
-              <Compass className="w-8 h-8 text-text-tertiary" />
-            </div>
-            {searchQuery ? (
-              <>
-                <h2 className="text-xl font-semibold mb-2">Ничего не найдено</h2>
-                <p className="text-muted-foreground">Попробуйте изменить поисковый запрос</p>
-              </>
-            ) : (
-              <>
-                <h2 className="text-xl font-semibold mb-2">Пока нет публичных деревьев</h2>
-                <p className="text-muted-foreground mb-6">Создайте первое дерево и поделитесь им с сообществом</p>
-                <Button onClick={() => router.push('/tree/new')}>Создать дерево</Button>
-              </>
-            )}
-          </div>
+          searchQuery ? (
+            <EmptyState icon={SearchX} title="Ничего не найдено" description="Попробуйте изменить поисковый запрос" />
+          ) : (
+            <EmptyState
+              icon={Compass}
+              title="Пока нет публичных деревьев"
+              description="Создайте первое дерево и поделитесь им с сообществом"
+              action={<Button onClick={() => router.push('/tree/new')}>Создать дерево</Button>}
+            />
+          )
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleTrees.map((tree) => (

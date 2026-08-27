@@ -5,7 +5,7 @@ import { useAuth } from '@/features/auth/ui/useAuth'
 import { AuthButton } from '@/features/auth/ui/AuthButton'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 
 export default function LoginPage() {
   const { data: session, status } = useAuth()
@@ -22,16 +22,23 @@ export default function LoginPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex items-center justify-center p-4" role="status" aria-label="Загрузка">
+        <div className="w-full max-w-md bg-card border border-border rounded-lg p-8 space-y-4 animate-pulse">
+          <div className="h-8 w-24 rounded bg-muted mx-auto" />
+          <div className="h-4 w-56 rounded bg-muted mx-auto" />
+          <div className="h-12 w-full rounded-md bg-muted mt-6" />
+        </div>
       </div>
     )
   }
 
   if (session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex items-center justify-center p-4" role="status" aria-label="Перенаправление">
+        <div className="w-full max-w-md bg-card border border-border rounded-lg p-8 space-y-4 animate-pulse">
+          <div className="h-8 w-24 rounded bg-muted mx-auto" />
+          <div className="h-4 w-56 rounded bg-muted mx-auto" />
+        </div>
       </div>
     )
   }

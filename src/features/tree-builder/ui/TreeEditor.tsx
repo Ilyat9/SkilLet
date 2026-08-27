@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Panel } from '@xyflow/react'
 import { useTreeEditor, type EditorNode, type EditorEdge } from '@/features/tree-builder/model/useTreeEditor'
 import { Button } from '@/shared/ui/Button'
@@ -25,6 +25,18 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
   const [resourceType, setResourceType] = useState<'' | 'video' | 'article'>('')
   const [resourceUrl, setResourceUrl] = useState('')
   const [resourceTitle, setResourceTitle] = useState('')
+
+  // Индикатор «Сохранено»: показывается на 2с после успешной мутации.
+  const [showSaved, setShowSaved] = useState(false)
+  const wasLoadingRef = useRef(false)
+  useEffect(() => {
+    if (wasLoadingRef.current && !editor.isLoading && !editor.error) {
+      setShowSaved(true)
+      const timer = window.setTimeout(() => setShowSaved(false), 2000)
+      return () => window.clearTimeout(timer)
+    }
+    wasLoadingRef.current = editor.isLoading
+  }, [editor.isLoading, editor.error])
 
   const selectedNode = editor.nodes.find((n) => n.id === selectedNodeId)
   const isSelectedNodeBusy = selectedNodeId ? editor.busyIds.has(`node:${selectedNodeId}`) : false
@@ -129,6 +141,13 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
           </Button>
         </div>
         {editor.error && <Badge variant="error">{editor.error}</Badge>}
+        {/* Ненавязчивый индикатор фонового сохранения рядом с тулбаром. */}
+        {editor.isLoading && <Badge variant="default">Сохранение…</Badge>}
+        {!editor.isLoading && showSaved && (
+          <Badge variant="success" className="animate-toast-in">
+            Сохранено
+          </Badge>
+        )}
       </Panel>
 
       {(selectedNode || selectedEdgeId) && (

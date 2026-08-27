@@ -7,7 +7,8 @@ import { TreeCard } from '@/entities/tree/ui/TreeCard'
 import { TreeWithRelations } from '@/entities/tree/model/types'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Loader2, Lock } from 'lucide-react'
+import { Plus, Lock } from 'lucide-react'
+import { EmptyState } from '@/shared/ui/EmptyState'
 
 export default function DashboardPage() {
   const { data: session, status } = useAuth()
@@ -40,8 +41,22 @@ export default function DashboardPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" role="status" aria-label="Загрузка">
+          <div className="space-y-2 mb-8">
+            <div className="h-8 w-56 rounded bg-muted animate-pulse" />
+            <div className="h-4 w-64 rounded bg-muted animate-pulse" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-6 space-y-4 animate-pulse">
+                <div className="h-6 w-32 rounded bg-muted" />
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-3/4 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -67,23 +82,39 @@ export default function DashboardPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          /* Skeleton вместо спиннера — согласован с dashboard/loading.tsx. */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" role="status" aria-label="Загрузка деревьев">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-6 space-y-4 animate-pulse">
+                <div className="flex items-start justify-between">
+                  <div className="h-6 w-32 rounded bg-muted" />
+                  <div className="h-4 w-20 rounded bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-3 w-3/4 rounded bg-muted" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-5 w-20 rounded-full bg-muted" />
+                  <div className="h-5 w-16 rounded-full bg-muted" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : trees.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-card border border-border rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-text-tertiary" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2">У вас пока нет деревьев</h2>
-            <p className="text-muted-foreground mb-6">Создайте первое дерево или выберите публичное для изучения</p>
-            <Button asChild>
-              <Link href="/tree/new">
-                <Plus className="w-5 h-5 mr-2" />
-                Создать дерево
-              </Link>
-            </Button>
-          </div>
+          <EmptyState
+            icon={Lock}
+            title="У вас пока нет деревьев"
+            description="Создайте первое дерево или выберите публичное для изучения"
+            action={
+              <Button asChild>
+                <Link href="/tree/new">
+                  <Plus className="w-5 h-5 mr-2" />
+                  Создать дерево
+                </Link>
+              </Button>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {trees.map((tree) => (

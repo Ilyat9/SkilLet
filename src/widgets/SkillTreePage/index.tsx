@@ -12,8 +12,8 @@ import Link from 'next/link'
 import { parseResources } from '@/entities/node/model/schemas'
 import { useToast } from '@/shared/ui/Toast'
 import { Button } from '@/shared/ui/Button'
+import { EmptyState } from '@/shared/ui/EmptyState'
 import {
-  Loader2,
   ArrowLeft,
   PencilLine,
   Share2,
@@ -191,9 +191,34 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
   }
 
   if (status === 'loading' || isLoading) {
+    /* Skeleton тулбар+canvas+sidebar — согласован с tree/[id]/loading.tsx. */
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="h-screen bg-background flex flex-col" role="status" aria-label="Загрузка дерева">
+        <div className="bg-card border-b border-border shrink-0">
+          <div className="px-3 sm:px-4 py-3 flex items-center gap-4">
+            <div className="w-9 h-9 rounded bg-muted animate-pulse shrink-0" />
+            <div className="space-y-1.5 min-w-0 flex-1 max-w-xs">
+              <div className="h-5 w-40 rounded bg-muted animate-pulse" />
+              <div className="h-3 w-56 rounded bg-muted animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-1 min-h-0">
+          <div className="flex-1 p-2 sm:p-4 overflow-hidden">
+            <div className="h-full w-full rounded-lg border border-border bg-muted/30 animate-pulse" />
+          </div>
+          {!isEditMode && (
+            <aside className="hidden lg:block w-80 border-l border-border p-4 bg-card shrink-0 space-y-4">
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="h-5 w-24 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-36 rounded bg-muted animate-pulse" />
+                <div className="h-4 w-full rounded-full bg-muted animate-pulse" />
+              </div>
+              <div className="rounded-lg border border-border p-4 h-14 animate-pulse" />
+              <div className="rounded-lg border border-border p-4 h-14 animate-pulse" />
+            </aside>
+          )}
+        </div>
       </div>
     )
   }
@@ -297,24 +322,25 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
     >
       {/* Содержимое основной области */}
       {!isEditMode && totalNodes === 0 ? (
-        /* Пустое дерево: понятная заглушка с CTA для владельца. */
-        <div className="h-full flex items-center justify-center">
-          <div className="text-center max-w-md px-4">
-            <PlusCircle className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">В дереве пока нет навыков</h2>
-          <p className="text-muted-foreground mb-6">
-              {isOwner
-                ? 'Добавьте первый узел и свяжите его с будущими — дальше дерево растёт само.'
-                : 'Автор ещё не наполнил это дерево навыками. Загляните позже!'}
-            </p>
-            {isOwner && (
+        /* Пустое дерево: единый EmptyState с CTA для владельца. */
+        <EmptyState
+          icon={PlusCircle}
+          title="В дереве пока нет навыков"
+          description={
+            isOwner
+              ? 'Добавьте первый узел и свяжите его с будущими — дальше дерево растёт само.'
+              : 'Автор ещё не наполнил это дерево навыками. Загляните позже!'
+          }
+          action={
+            isOwner ? (
               <Button onClick={() => setIsEditMode(true)}>
                 <PencilLine className="w-4 h-4 mr-2" />
                 Добавить первый узел
               </Button>
-            )}
-          </div>
-        </div>
+            ) : undefined
+          }
+          className="h-full flex items-center justify-center"
+        />
       ) : isEditMode && isOwner ? (
         <TreeEditor
           treeId={tree.id}
@@ -422,8 +448,8 @@ function TreePageLayout({
 
             {sidebarOpen && (
               <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center">
-                <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-                <div className="relative w-full max-h-[75vh] overflow-y-auto bg-card border-t border-border rounded-t-xl p-4 pb-8">
+                <div className="absolute inset-0 bg-black/50 animate-overlay-in" onClick={() => setSidebarOpen(false)} />
+                <div className="relative w-full max-h-[75vh] overflow-y-auto bg-card border-t border-border rounded-t-xl p-4 pb-8 animate-sheet-up">
                   <div className="flex items-center justify-between mb-3 sticky top-0 bg-card pb-2">
                     <h2 className="font-semibold">Прогресс по узлам</h2>
                     <button

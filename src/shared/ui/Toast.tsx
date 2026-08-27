@@ -72,7 +72,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
               key={toast.id}
               className={cn(
-                'flex items-start gap-2 border rounded-lg p-3 shadow-lg text-sm',
+                'flex items-start gap-2 border rounded-lg p-3 shadow-lg text-sm animate-toast-in',
+                toast.variant === 'achievement' && 'animate-achievement-pulse',
                 config.classes
               )}
             >
