@@ -22,8 +22,12 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [difficulty, setDifficulty] = useState(1)
+  const [resourceType, setResourceType] = useState<'' | 'video' | 'article'>('')
+  const [resourceUrl, setResourceUrl] = useState('')
+  const [resourceTitle, setResourceTitle] = useState('')
 
   const selectedNode = editor.nodes.find((n) => n.id === selectedNodeId)
+  const isSelectedNodeBusy = selectedNodeId ? editor.busyIds.has(`node:${selectedNodeId}`) : false
 
   const handleNodeClick = (_e: React.MouseEvent, node: EditorNode) => {
     setSelectedEdgeId(null)
@@ -31,16 +35,46 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
     setTitle(node.data.title)
     setDescription(node.data.description ?? '')
     setDifficulty(node.data.difficulty)
+    // Ресурс в БД хранится массивом с одним элементом — заполняем поля из него.
+    if (node.data.resourceType && node.data.resourceUrl) {
+      setResourceType(node.data.resourceType)
+      setResourceUrl(node.data.resourceUrl)
+      setResourceTitle(node.data.resourceTitle ?? '')
+    } else {
+      setResourceType('')
+      setResourceUrl('')
+      setResourceTitle('')
+    }
   }
 
   const handleSaveContent = async () => {
     if (!selectedNodeId) return
+    // Все три ресурсных поля идут вместе: частично заполненный ресурс не сохраняем.
+    const isResourceFilled = resourceType && resourceUrl.trim() && resourceTitle.trim()
+    const hadResource = Boolean(selectedNode?.data.resourceType && selectedNode?.data.resourceUrl)
     const ok = await editor.saveNodeContent(selectedNodeId, {
       title,
       ...(description ? { description } : {}),
       difficulty,
+      ...(isResourceFilled
+        ? {
+            resourceType,
+            resourceUrl: resourceUrl.trim(),
+            resourceTitle: resourceTitle.trim(),
+          }
+        : hadResource && !resourceType
+          ? // Пользователь выбрал «Без ресурса» у узла с ресурсом — удаляем его.
+            { clearResource: true }
+          : {}),
     })
     if (ok) onChanged?.()
+  }
+
+  const handleDeleteSelectedNode = async () => {
+    if (!selectedNodeId) return
+    await editor.deleteNode(selectedNodeId)
+    setSelectedNodeId(null)
+    onChanged?.()
   }
 
   const handleDeleteSelectedEdge = async () => {
@@ -49,6 +83,9 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
     setSelectedEdgeId(null)
     onChanged?.()
   }
+
+  const isInputClass =
+    'w-full bg-gray-800 border border-border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary'
 
   return (
     <div className="relative w-full h-full">
@@ -104,14 +141,16 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Название"
-                  className="w-full bg-gray-800 border border-border rounded px-2 py-1.5 text-sm"
+                  maxLength={200}
+                  className={isInputClass}
                 />
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Описание"
                   rows={2}
-                  className="w-full bg-gray-800 border border-border rounded px-2 py-1.5 text-sm"
+                  maxLength={1000}
+                  className={isInputClass}
                 />
                 <label className="flex items-center gap-2 text-xs text-gray-400">
                   Сложность:
@@ -124,20 +163,60 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
                   />
                   <span className="text-foreground">{difficulty}/10</span>
                 </label>
+
+                {/* Ресурс: тип + URL + заголовок (сохраним только при заполнении всех полей). */}
+                <div className="border-t border-border pt-3 space-y-2">
+                  <p className="text-xs text-gray-400 font-medium">Ресурс (необязательно)</p>
+                  <select
+                    value={resourceType}
+                    onChange={(e) => setResourceType(e.target.value as '' | 'video' | 'article')}
+                    className={isInputClass}
+                  >
+                    <option value="">Без ресурса</option>
+                    <option value="video">Видео</option>
+                    <option value="article">Статья</option>
+                  </select>
+                  {resourceType !== '' && (
+                    <>
+                      <input
+                        value={resourceUrl}
+                        onChange={(e) => setResourceUrl(e.target.value)}
+                        placeholder="https://ссылка-на-ресурс"
+                        type="url"
+                        maxLength={500}
+                        className={isInputClass}
+                      />
+                      <input
+                        value={resourceTitle}
+                        onChange={(e) => setResourceTitle(e.target.value)}
+                        placeholder="Заголовок ресурса"
+                        maxLength={200}
+                        className={isInputClass}
+                      />
+                      {(resourceUrl.trim() || resourceTitle.trim()) &&
+                        (!resourceUrl.trim() || !resourceTitle.trim()) && (
+                          <p className="text-xs text-yellow-500">
+                            Заполните и ссылку, и заголовок — иначе ресурс не сохранится.
+                          </p>
+                        )}
+                    </>
+                  )}
+                </div>
+
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => void handleSaveContent()} disabled={editor.isLoading}>
-                    <Save className="w-4 h-4 mr-1" />
+                  <Button size="sm" onClick={() => void handleSaveContent()} disabled={isSelectedNodeBusy}>
+                    {isSelectedNodeBusy ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-1" />
+                    )}
                     Сохранить
                   </Button>
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() =>
-                      void editor.deleteNode(selectedNodeId ?? '').then(() => {
-                        setSelectedNodeId(null)
-                        onChanged?.()
-                      })
-                    }
+                    disabled={isSelectedNodeBusy}
+                    onClick={() => void handleDeleteSelectedNode()}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
                     Удалить

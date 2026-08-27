@@ -4,6 +4,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { NodeUpdateSchema } from '@/entities/node/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { parseJsonBody } from '@/shared/lib/api'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -62,8 +63,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const body = await request.json()
-    const validation = NodeUpdateSchema.safeParse(body)
+    const parsedBody = await parseJsonBody(request)
+    if (parsedBody.error) return parsedBody.error
+
+    const validation = NodeUpdateSchema.safeParse(parsedBody.body)
 
     if (!validation.success) {
       return NextResponse.json(
@@ -72,12 +75,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const { title, description, positionX, positionY, difficulty, resourceType, resourceUrl, resourceTitle } =
+    const { title, description, positionX, positionY, difficulty, resourceType, resourceUrl, resourceTitle,
+      clearResource } =
       validation.data
 
-    // Если передан хотя бы один ресурсный филд — пересобираем массив resources целиком.
+    // Ресурс хранится массивом с максимум одним элементом.
     let resources: Array<{ type: 'video' | 'article'; url: string; title: string }> | undefined
-    if (resourceType !== undefined || resourceUrl !== undefined || resourceTitle !== undefined) {
+    if (clearResource === true) {
+      // Явное удаление ресурса с узла.
+      resources = []
+    } else if (resourceType !== undefined || resourceUrl !== undefined || resourceTitle !== undefined) {
+      // Если передан хотя бы один ресурсный филд — пересобираем массив resources целиком:
+      // полный комплект полей даёт ресурс, частичный — убирает его.
       resources =
         resourceType && resourceUrl && resourceTitle
           ? [{ type: resourceType, url: resourceUrl, title: resourceTitle }]

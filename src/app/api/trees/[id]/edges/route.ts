@@ -5,6 +5,7 @@ import { auth } from '@/shared/lib/auth'
 import { validateEdge } from '@/shared/lib/dag'
 import { z } from 'zod'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { parseJsonBody } from '@/shared/lib/api'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,8 +48,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const body = await request.json()
-    const validation = EdgeCreateSchema.safeParse(body)
+    const parsedBody = await parseJsonBody(request)
+    if (parsedBody.error) return parsedBody.error
+
+    const validation = EdgeCreateSchema.safeParse(parsedBody.body)
 
     if (!validation.success) {
       return NextResponse.json(

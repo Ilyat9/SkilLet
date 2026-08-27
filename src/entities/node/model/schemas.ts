@@ -23,17 +23,20 @@ export const NodeSchema = z.object({
   description: z.string().max(1000, 'Слишком длинное описание').optional(),
   positionX: z.number().min(-1000).max(1000),
   positionY: z.number().min(-1000).max(1000),
-  difficulty: z.number().min(1).max(10),
+  difficulty: z.number().int().min(1).max(10),
   resourceType: z.enum(['video', 'article']).optional(),
   resourceUrl: z.string().url('Некорректный URL').optional(),
   resourceTitle: z.string().max(200).optional(),
+  /** Явный сигнал «убрать ресурс с узла» — в PATCH пересобирает resources = []. */
+  clearResource: z.boolean().optional(),
 })
 
 export const NodeCreateSchema = NodeSchema.partial().extend({
-  title: z.string().min(1),
+  // Создание требует название; лимиты держим теми же, что в базовой схеме.
+  title: z.string().min(1, 'Название обязательно').max(200, 'Слишком длинное название'),
   positionX: z.number().default(0),
   positionY: z.number().default(0),
-  difficulty: z.number().default(1),
+  difficulty: z.number().int().min(1).max(10).default(1),
 })
 
 export const NodeUpdateSchema = NodeSchema.partial()

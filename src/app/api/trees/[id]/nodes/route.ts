@@ -4,6 +4,8 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { NodeCreateSchema } from '@/entities/node/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { parseJsonBody } from '@/shared/lib/api'
+import { MAX_NODES_PER_TREE } from '@/shared/constants'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,8 +43,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const body = await request.json()
-    const validation = NodeCreateSchema.safeParse(body)
+    // Лимит количества узлов на дерево — защита от аномальных нагрузок.
+    const nodeCount = await prisma.node.count({ where: { treeId } })
+    if (nodeCount >= MAX_NODES_PER_TREE) {
+      return NextResponse.json(
+        createErrorResponse(`Достигнут лимит: не больше ${MAX_NODES_PER_TREE} узлов на дерево`, 'LIMIT_REACHED'),
+        { status: 400 }
+      )
+    }
+
+    const parsedBody = await parseJsonBody(request)
+    if (parsedBody.error) return parsedBody.error
+
+    const validation = NodeCreateSchema.safeParse(parsedBody.body)
 
     if (!validation.success) {
       return NextResponse.json(

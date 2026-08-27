@@ -4,6 +4,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { TreeCreateSchema } from '@/entities/tree/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { parseJsonBody } from '@/shared/lib/api'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -79,8 +80,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
-    const validation = TreeCreateSchema.safeParse(body)
+    const parsedBody = await parseJsonBody(request)
+    if (parsedBody.error) return parsedBody.error
+
+    const validation = TreeCreateSchema.safeParse(parsedBody.body)
 
     if (!validation.success) {
       return NextResponse.json(
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
       return tree
     })
 
-    return NextResponse.json(createSuccessResponse(result))
+    return NextResponse.json(createSuccessResponse(result), { status: 201 })
   } catch (error) {
     console.error('[POST /api/trees]', error)
     return NextResponse.json(

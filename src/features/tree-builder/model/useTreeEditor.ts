@@ -13,12 +13,18 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import { validateEdge } from '@/shared/lib/dag'
+import { useToast } from '@/shared/ui/Toast'
 import '@xyflow/react/dist/style.css'
 
 export type TreeNodeData = {
   title: string
   description?: string | undefined
   difficulty: number
+  resourceType?: 'video' | 'article' | undefined
+  resourceUrl?: string | undefined
+  resourceTitle?: string | undefined
+  /** Запрос на удаление ресурса с узла (см. NodeUpdateSchema). */
+  clearResource?: boolean | undefined
 }
 
 export type EditorNode = FlowNode<TreeNodeData>
@@ -36,13 +42,15 @@ export interface UseTreeEditorReturn {
   onNodesChange: (changes: NodeChange<EditorNode>[]) => void
   onEdgesChange: (changes: EdgeChange<EditorEdge>[]) => void
   onConnect: (connection: Connection) => Promise<void>
-  saveNodePosition: (nodeId: string, positionX: number, positionY: number) => Promise<void>
+  saveNodePosition: (nodeId: string, positionX: number, positionY: number) => Promise<boolean>
   saveNodeContent: (nodeId: string, data: TreeNodeData) => Promise<boolean>
   addNode: (position: { x: number; y: number }) => Promise<void>
   deleteNode: (nodeId: string) => Promise<void>
   deleteEdge: (edgeId: string) => Promise<void>
   fitView: () => void
   isLoading: boolean
+  /** Id узлов и рёбер, над которыми прямо сейчас идёт мутация — для точечных спиннеров. */
+  busyIds: Set<string>
   error: string | null
 }
 
@@ -58,8 +66,31 @@ export function useTreeEditor({ treeId, initialNodes = [], initialEdges = [] }: 
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorNode>(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<EditorEdge>(initialEdges)
   const [isLoading, setIsLoading] = useState(false)
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const { fitView: fitViewViewport } = useReactFlow()
+  const { showToast } = useToast()
+
+  const markBusy = useCallback((id: string, busy: boolean) => {
+    setBusyIds((prev) => {
+      const next = new Set(prev)
+      if (busy) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
+      return next
+    })
+  }, [])
+
+  const failWith = useCallback(
+    (message: unknown, fallback: string) => {
+      const text = message instanceof Error ? message.message : fallback
+      setError(text)
+      showToast(text, 'error')
+    },
+    [showToast]
+  )
 
   const onConnect = useCallback(
     async (connection: Connection) => {
@@ -68,8 +99,10 @@ export function useTreeEditor({ treeId, initialNodes = [], initialEdges = [] }: 
       const validation = validateEdge(dagEdges, treeId, connection.source, connection.target)
       if (!validation.valid) {
         setError(validation.error ?? 'Invalid edge')
+        showToast(validation.error ?? 'Invalid edge', 'error')
         return
       }
+      markBusy(`edge:${connection.source}:${connection.target}`, true)
       try {
         setIsLoading(true)
         const created = await apiRequest<{ id: string }>(`/api/trees/${treeId}/edges`, {
@@ -79,57 +112,83 @@ export function useTreeEditor({ treeId, initialNodes = [], initialEdges = [] }: 
         setEdges((eds) => addEdge({ ...connection, id: created.id, type: 'smoothstep' }, eds) as EditorEdge[])
         setError(null)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не удалось создать связь')
+        failWith(e, 'Не удалось создать связь')
       } finally {
         setIsLoading(false)
+        markBusy(`edge:${connection.source}:${connection.target}`, false)
       }
     },
-    [edges, treeId, setEdges]
+    // showToast стабилен (useCallback в провайдере) — добавляем для полноты контракта хука.
+    [edges, treeId, setEdges, markBusy, failWith, showToast]
   )
 
   const patchNode = useCallback(
     async (nodeId: string, body: Record<string, unknown>) => {
-      await fetch(`/api/trees/${treeId}/nodes/${nodeId}`, {
+      await apiRequest<unknown>(`/api/trees/${treeId}/nodes/${nodeId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
     },
     [treeId]
   )
 
+  /**
+   * Сохраняет позицию после завершения drag&drop: один PATCH на весь драг,
+   * а не на каждое изменение координат (эквивалент debounce по смыслу).
+   * Ошибка не откатывает перетаскивание (позиция уже применена локально),
+   * но честно показывается пользователю.
+   */
   const saveNodePosition = useCallback(
     async (nodeId: string, positionX: number, positionY: number) => {
       try {
         await patchNode(nodeId, { positionX, positionY })
+        return true
       } catch (e) {
-        console.error('Не удалось сохранить позицию узла:', e)
+        failWith(e, 'Не удалось сохранить позицию узла')
+        return false
       }
     },
-    [patchNode]
+    [patchNode, failWith]
   )
+
 
   const saveNodeContent = useCallback(
     async (nodeId: string, data: TreeNodeData) => {
+      markBusy(`node:${nodeId}`, true)
       try {
         setIsLoading(true)
-        await patchNode(nodeId, data)
+        // Отправляем только заполненные ресурсные поля — сервер собирает
+        // массив resources по правилам NodeUpdateSchema.
+        const body: Record<string, unknown> = {
+          title: data.title,
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          difficulty: data.difficulty,
+          ...(data.clearResource
+            ? { clearResource: true }
+            : data.resourceType && data.resourceUrl && data.resourceTitle
+              ? { resourceType: data.resourceType, resourceUrl: data.resourceUrl, resourceTitle: data.resourceTitle }
+              : {}),
+        }
+        await patchNode(nodeId, body)
         setNodes((nds) => nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n)))
         setError(null)
         return true
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не удалось сохранить узел')
+        failWith(e, 'Не удалось сохранить узел')
         return false
       } finally {
         setIsLoading(false)
+        markBusy(`node:${nodeId}`, false)
       }
     },
-    [patchNode, setNodes]
+    [patchNode, setNodes, markBusy, failWith]
   )
 
 
   const addNode = useCallback(
     async (position: { x: number; y: number }) => {
+      const optimisticKey = 'optimistic-node'
+      markBusy(optimisticKey, true)
       try {
         setIsLoading(true)
         const created = await apiRequest<{
@@ -156,46 +215,64 @@ export function useTreeEditor({ treeId, initialNodes = [], initialEdges = [] }: 
         setNodes((nds) => [...nds, newNode])
         setError(null)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не удалось создать узел')
+        failWith(e, 'Не удалось создать узел')
       } finally {
         setIsLoading(false)
+        markBusy(optimisticKey, false)
       }
     },
-    [treeId, setNodes]
+    [treeId, setNodes, markBusy, failWith]
   )
 
+  /**
+   * Оптимистичное удаление узла: узел и его рёбра исчезают сразу,
+   * при ошибке сервера состояние откатывается.
+   */
   const deleteNode = useCallback(
     async (nodeId: string) => {
+      markBusy(`node:${nodeId}`, true)
+      const prevNodes = nodes
+      const prevEdges = edges
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId))
+      // Связанные рёбра удалятся каскадно на сервере — убираем их локально сразу.
+      setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId))
       try {
         setIsLoading(true)
         await apiRequest<{ message: string }>(`/api/trees/${treeId}/nodes/${nodeId}`, { method: 'DELETE' })
-        setNodes((nds) => nds.filter((n) => n.id !== nodeId))
-        // Связанные рёбра удалятся каскадно на сервере — убираем их локально.
-        setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId))
         setError(null)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не удалось удалить узел')
+        // Rollback оптимистичного обновления.
+        setNodes(prevNodes)
+        setEdges(prevEdges)
+        failWith(e, 'Не удалось удалить узел')
       } finally {
         setIsLoading(false)
+        markBusy(`node:${nodeId}`, false)
       }
     },
-    [treeId, setNodes, setEdges]
+    [treeId, nodes, edges, setNodes, setEdges, markBusy, failWith]
   )
 
+  /** Оптимистичное удаление ребра с rollback при ошибке. */
   const deleteEdge = useCallback(
     async (edgeId: string) => {
+      markBusy(`edge:${edgeId}`, true)
+      const prevEdges = edges
+      setEdges((eds) => eds.filter((e) => e.id !== edgeId))
       try {
         setIsLoading(true)
-        await fetch(`/api/trees/${treeId}/edges/${edgeId}`, { method: 'DELETE' })
-        setEdges((eds) => eds.filter((e) => e.id !== edgeId))
+        await apiRequest<{ message: string }>(`/api/trees/${treeId}/edges/${edgeId}`, { method: 'DELETE' })
         setError(null)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Не удалось удалить связь')
+        // Rollback оптимистичного обновления.
+        setEdges(prevEdges)
+        failWith(e, 'Не удалось удалить связь')
       } finally {
         setIsLoading(false)
+        markBusy(`edge:${edgeId}`, false)
       }
     },
-    [treeId, setEdges]
+    [treeId, edges, setEdges, markBusy, failWith]
   )
 
   const fitView = useCallback(() => {
@@ -215,6 +292,7 @@ export function useTreeEditor({ treeId, initialNodes = [], initialEdges = [] }: 
     deleteEdge,
     fitView,
     isLoading,
+    busyIds,
     error,
   } satisfies UseTreeEditorReturn
 }

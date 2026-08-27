@@ -4,6 +4,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { TreeUpdateSchema } from '@/entities/tree/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { parseJsonBody } from '@/shared/lib/api'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -104,8 +105,10 @@ export async function PATCH(
       )
     }
 
-    const body = await request.json()
-    const validation = TreeUpdateSchema.safeParse(body)
+    const parsedBody = await parseJsonBody(request)
+    if (parsedBody.error) return parsedBody.error
+
+    const validation = TreeUpdateSchema.safeParse(parsedBody.body)
 
     if (!validation.success) {
       return NextResponse.json(
