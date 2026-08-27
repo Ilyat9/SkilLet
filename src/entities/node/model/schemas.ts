@@ -11,11 +11,15 @@ export const ResourcesSchema = z.array(resourceObjectSchema)
 
 /**
  * Ресурсы хранятся в Prisma как Json — приводим их к Resource[]
- * с рантайм-валидацией через zod. Невалидные значения дают пустой массив.
+ * с рантайм-валидацией через zod. Невалидные значения дают пустой массив,
+ * а при массиве с частью битых элементов — отбрасываются только они.
  */
 export function parseResources(value: unknown): Resource[] {
-  const result = ResourcesSchema.safeParse(value)
-  return result.success ? result.data : []
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    const result = resourceObjectSchema.safeParse(item)
+    return result.success ? [result.data] : []
+  })
 }
 
 export const NodeSchema = z.object({
