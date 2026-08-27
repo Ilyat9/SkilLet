@@ -66,7 +66,10 @@ export function Header() {
     <header className="bg-card border-b border-border sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">S</span>
             </div>
@@ -76,19 +79,23 @@ export function Header() {
           <nav className="flex items-center gap-4">
             {session?.user ? (
               <>
-                <Link href="/dashboard" className="text-text-secondary hover:text-foreground transition-colors">
+                <Link href="/dashboard" className="text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
                   Дашборд
                 </Link>
-                <Link href="/explore" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors">
+                <Link href="/explore" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
                   Каталог
                 </Link>
-                <Link href="/tree/new" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors">
+                <Link href="/tree/new" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
                   Создать дерево
                 </Link>
                 <div className="flex items-center gap-3 ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-border">
                   <ThemeToggle />
                   <StreakBadge />
-                  <Link href="/profile">
+                  <Link
+                    href="/profile"
+                    aria-label={session.user.name ? `Профиль: ${session.user.name}` : 'Профиль'}
+                    className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
                     {session.user.image ? (
                       <Image
                         src={session.user.image}
@@ -105,18 +112,19 @@ export function Header() {
                     <span className="text-sm text-foreground">{session.user.name || session.user.email}</span>
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-1 text-xs text-text-secondary hover:text-destructive transition-colors mt-1"
+                      aria-label="Выйти из аккаунта"
+                      className="flex items-center gap-1 text-xs text-text-secondary hover:text-destructive transition-colors mt-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
-                      <LogOut className="w-3 h-3" />
+                      <LogOut className="w-3 h-3" aria-hidden />
                       Выйти
                     </button>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="md:hidden p-1 text-text-secondary hover:text-destructive transition-colors"
+                    className="md:hidden p-1 text-text-secondary hover:text-destructive transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label="Выйти"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-4 h-4" aria-hidden />
                   </button>
                 </div>
               </>

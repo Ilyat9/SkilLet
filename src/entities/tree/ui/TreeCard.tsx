@@ -13,16 +13,31 @@ interface TreeCardProps {
 }
 
 export function TreeCard({ tree, isPublic, onExplore, onSelect }: TreeCardProps) {
+  const action = onSelect ?? onExplore
+
+  // Enter/Space активируют карточку с клавиатуры так же, как клик.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!action) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      action()
+    }
+  }
+
   return (
     <div
       className={cn(
         'bg-card border border-border rounded-lg p-6 cursor-pointer hover:border-primary transition-colors group',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         {
-          'cursor-pointer': onSelect || onExplore,
-          'cursor-default': !onSelect && !onExplore,
+          'cursor-pointer': Boolean(action),
+          'cursor-default': !action,
         }
       )}
-      onClick={onSelect || onExplore}
+      onClick={action}
+      onKeyDown={handleKeyDown}
+      {...(action ? { role: 'button', tabIndex: 0 } : {})}
+      aria-label={`Дерево «${tree.title}»${tree._count?.nodes ? `, ${tree._count.nodes} навыков` : ''}${isPublic ? ', публичное' : ', приватное'}`}
     >
       <div className="flex items-start justify-between mb-4">
         <h3 className="text-xl font-semibold text-foreground">{tree.title}</h3>

@@ -413,9 +413,10 @@ function TreePageLayout({
           <>
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden fixed bottom-4 right-4 z-40 flex items-center gap-2 bg-primary text-primary-foreground rounded-full px-4 py-3 shadow-lg"
+              className="lg:hidden fixed bottom-4 right-4 z-40 flex items-center gap-2 bg-primary text-primary-foreground rounded-full px-4 py-3 shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              aria-label="Открыть панель прогресса"
             >
-              <ListChecks className="w-5 h-5" />
+              <ListChecks className="w-5 h-5" aria-hidden />
               Прогресс
             </button>
 
@@ -428,9 +429,9 @@ function TreePageLayout({
                     <button
                       onClick={() => setSidebarOpen(false)}
                       aria-label="Закрыть"
-                      className="p-1 rounded hover:bg-secondary"
+                      className="p-1 rounded hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-5 h-5" aria-hidden />
                     </button>
                   </div>
                   {sidebarContent}
