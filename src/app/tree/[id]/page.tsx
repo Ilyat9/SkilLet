@@ -17,7 +17,8 @@ export async function generateMetadata({ params }: TreePageProps): Promise<Metad
     })
 
     if (!tree) {
-      return { title: 'Дерево не найдено — SkilLet' }
+      // Строка прогонится через title.template из layout → «... — SkilLet».
+      return { title: 'Дерево не найдено' }
     }
 
     // Мета-теги отдаются и для приватных деревьев (только название),
