@@ -8,7 +8,7 @@ import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
 import { Button } from '@/shared/ui/Button'
 import { ThemeToggle } from '@/shared/ui/ThemeToggle'
-import { Flame, LogOut } from 'lucide-react'
+import { Flame, LogOut, Menu, X } from 'lucide-react'
 
 interface StreakInfo {
   currentStreak: number
@@ -53,6 +53,7 @@ function StreakBadge() {
 
 export function Header() {
   const { data: session, status } = useAuth()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: '/login' })
@@ -64,7 +65,7 @@ export function Header() {
 
   return (
     <header className="bg-card border-b border-border sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link
             href="/dashboard"
@@ -76,19 +77,22 @@ export function Header() {
             <span className="font-bold text-xl text-foreground">SkilLet</span>
           </Link>
 
-          <nav className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {session?.user ? (
               <>
-                <Link href="/dashboard" className="text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
-                  Дашборд
-                </Link>
-                <Link href="/explore" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
-                  Каталог
-                </Link>
-                <Link href="/tree/new" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
-                  Создать дерево
-                </Link>
-                <div className="flex items-center gap-3 ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-border">
+                {/* Desktop-навигация: ссылки видны от sm и выше. */}
+                <nav className="hidden sm:flex items-center gap-4" aria-label="Основная навигация">
+                  <Link href="/dashboard" className="text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
+                    Дашборд
+                  </Link>
+                  <Link href="/explore" className="text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
+                    Каталог
+                  </Link>
+                  <Link href="/tree/new" className="text-text-secondary hover:text-foreground transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary px-1 py-0.5">
+                    Создать дерево
+                  </Link>
+                </nav>
+                <div className="flex items-center gap-2 sm:gap-3 ml-1 sm:ml-4 pl-2 sm:pl-4 border-l border-border">
                   <ThemeToggle />
                   <StreakBadge />
                   <Link
@@ -108,32 +112,77 @@ export function Header() {
                       <span className="text-sm text-text-secondary hover:text-foreground transition-colors">Профиль</span>
                     )}
                   </Link>
-                  <div className="hidden md:flex flex-col">
-                    <span className="text-sm text-foreground">{session.user.name || session.user.email}</span>
-                    <button
-                      onClick={handleLogout}
-                      aria-label="Выйти из аккаунта"
-                      className="flex items-center gap-1 text-xs text-text-secondary hover:text-destructive transition-colors mt-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <LogOut className="w-3 h-3" aria-hidden />
-                      Выйти
-                    </button>
-                  </div>
                   <button
                     onClick={handleLogout}
-                    className="md:hidden p-1 text-text-secondary hover:text-destructive transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    aria-label="Выйти"
+                    aria-label="Выйти из аккаунта"
+                    className="hidden md:flex items-center gap-1 text-xs text-text-secondary hover:text-destructive transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <LogOut className="w-4 h-4" aria-hidden />
+                    <LogOut className="w-3 h-3" aria-hidden />
+                    Выйти
+                  </button>
+
+                  {/* Гамбургер: ниже md вместо строки ссылок. */}
+                  <button
+                    onClick={() => setIsMobileMenuOpen((v) => !v)}
+                    className="md:hidden p-2 rounded-md text-text-secondary hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={isMobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+                    aria-expanded={isMobileMenuOpen}
+                    aria-controls="mobile-menu"
+                  >
+                    {isMobileMenuOpen ? (
+                      <X className="w-5 h-5" aria-hidden />
+                    ) : (
+                      <Menu className="w-5 h-5" aria-hidden />
+                    )}
                   </button>
                 </div>
               </>
             ) : (
-              <Button onClick={() => (window.location.href = '/login')}>Войти</Button>
+              <Button onClick={() => (window.location.href = '/login')} size="sm">
+                Войти
+              </Button>
             )}
-          </nav>
+          </div>
         </div>
       </div>
+
+      {/* Мобильное меню: выпадающая панель под хедером (ниже md). */}
+      {session?.user && isMobileMenuOpen && (
+        <nav
+          id="mobile-menu"
+          aria-label="Мобильная навигация"
+          className="md:hidden border-t border-border bg-card px-4 py-3 space-y-1 shadow-lg"
+        >
+          <Link
+            href="/dashboard"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block px-2 py-2 rounded-md text-sm text-text-secondary hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Дашборд
+          </Link>
+          <Link
+            href="/explore"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block px-2 py-2 rounded-md text-sm text-text-secondary hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Каталог
+          </Link>
+          <Link
+            href="/tree/new"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block px-2 py-2 rounded-md text-sm text-text-secondary hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Создать дерево
+          </Link>
+          <button
+            onClick={() => void handleLogout()}
+            className="w-full flex items-center gap-2 px-2 py-2 rounded-md text-sm text-text-secondary hover:text-destructive hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <LogOut className="w-4 h-4" aria-hidden />
+            Выйти
+          </button>
+        </nav>
+      )}
     </header>
   )
 }
