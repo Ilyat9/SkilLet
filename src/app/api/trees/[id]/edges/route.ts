@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
@@ -6,6 +7,7 @@ import { validateEdge } from '@/shared/lib/dag'
 import { z } from 'zod'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
+import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -46,6 +48,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         createErrorResponse('Forbidden', 'FORBIDDEN'),
         { status: 403 }
       )
+    }
+
+    // Rate limit на создание связей.
+    const rateLimit = checkRateLimit(`edge-create:${session.user.id}:${treeId}`, WRITE_RATE_LIMIT_MS)
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit)
     }
 
     const parsedBody = await parseJsonBody(request)
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse(edge), { status: 201 })
   } catch (error) {
-    console.error('[POST /api/trees/[id]/edges]', error)
+    logApiError('POST /api/trees/[id]/edges', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

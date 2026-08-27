@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -5,6 +6,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
+import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
 import { hasCycle } from '@/shared/lib/dag'
 import { MAX_NODES_PER_TREE } from '@/shared/constants'
 
@@ -43,6 +45,12 @@ export async function POST(request: NextRequest) {
         createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
         { status: 401 }
       )
+    }
+
+    // Rate limit: создание из шаблона тяжелее обычного создания — лимит строже.
+    const rateLimit = checkRateLimit(`tree-template:${session.user.id}`, WRITE_RATE_LIMIT_MS * 3)
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit)
     }
 
     const parsedBody = await parseJsonBody(request)
@@ -132,7 +140,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('[POST /api/trees/from-template]', error)
+    logApiError('POST /api/trees/from-template', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

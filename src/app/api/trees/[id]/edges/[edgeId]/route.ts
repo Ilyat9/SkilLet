@@ -1,8 +1,10 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +20,12 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
         createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
         { status: 401 }
       )
+    }
+
+    // Rate limit на удаление связей.
+    const rateLimit = checkRateLimit(`edge-delete:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit)
     }
 
     const { id: treeId, edgeId } = await params
@@ -57,7 +65,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse({ message: 'Edge deleted' }))
   } catch (error) {
-    console.error('[DELETE /api/trees/[id]/edges/[edgeId]]', error)
+    logApiError('DELETE /api/trees/[id]/edges/[edgeId]', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

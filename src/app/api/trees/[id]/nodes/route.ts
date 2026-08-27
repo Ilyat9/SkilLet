@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
@@ -6,6 +7,7 @@ import { NodeCreateSchema } from '@/entities/node/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
 import { MAX_NODES_PER_TREE } from '@/shared/constants'
+import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,6 +43,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         createErrorResponse('Forbidden', 'FORBIDDEN'),
         { status: 403 }
       )
+    }
+
+    // Rate limit на массовое создание узлов.
+    const rateLimit = checkRateLimit(`node-create:${session.user.id}:${treeId}`, WRITE_RATE_LIMIT_MS)
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit)
     }
 
     // Лимит количества узлов на дерево — защита от аномальных нагрузок.
@@ -86,7 +94,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse(node), { status: 201 })
   } catch (error) {
-    console.error('[POST /api/trees/[id]/nodes]', error)
+    logApiError('POST /api/trees/[id]/nodes', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

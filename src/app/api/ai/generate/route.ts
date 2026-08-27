@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -253,7 +254,7 @@ export async function POST(request: NextRequest) {
     const generation = await generateValidatedTree(topic)
 
     if ('error' in generation) {
-      console.error('[POST /api/ai/generate] модель вернула невалидный ответ:', generation.error)
+      logApiError('POST /api/ai/generate', generation.error, { detail: 'модель вернула невалидный ответ' })
       return NextResponse.json(
         createErrorResponse(
           'Модель не смогла вернуть корректное дерево. Попробуйте переформулировать тему.',
@@ -321,7 +322,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('[POST /api/ai/generate]', error)
+    logApiError('POST /api/ai/generate', error)
     return NextResponse.json(
       createErrorResponse('Ошибка AI-генерации', 'INTERNAL_ERROR'),
       { status: 500 }

@@ -27,3 +27,25 @@ export function checkRateLimit(key: string, intervalMs: number): RateLimitResult
   buckets.set(key, now)
   return { allowed: true, retryAfterMs: 0 }
 }
+
+/** Окно по умолчанию для мутаций деревьев/узлов/рёбер. */
+export const WRITE_RATE_LIMIT_MS = 60_000
+
+/**
+ * Единый ответ 429 для мутирующих роутов при превышении лимита.
+ * Retry-After в секундах — стандартный заголовок для клиентов и мониторинга.
+ */
+export function rateLimitResponse(result: RateLimitResult): Response {
+  return new Response(
+    JSON.stringify({
+      error: { message: 'Слишком много запросов. Попробуйте чуть позже.', code: 'RATE_LIMITED' },
+    }),
+    {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(Math.ceil(result.retryAfterMs / 1000)),
+      },
+    }
+  )
+}

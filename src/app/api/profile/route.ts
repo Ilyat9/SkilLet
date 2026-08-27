@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
@@ -67,7 +68,7 @@ export async function GET() {
       })
     )
   } catch (error) {
-    console.error('[GET /api/profile]', error)
+    logApiError('GET /api/profile', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

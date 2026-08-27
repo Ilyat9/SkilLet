@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
@@ -5,6 +6,7 @@ import { auth } from '@/shared/lib/auth'
 import { NodeUpdateSchema } from '@/entities/node/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
+import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +38,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
         { status: 401 }
       )
+    }
+
+    // Rate limit на обновление узлов.
+    const rateLimit = checkRateLimit(`node-update:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit)
     }
 
     const { id: treeId, nodeId } = await params
@@ -107,7 +115,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse(node))
   } catch (error) {
-    console.error('[PATCH /api/trees/[id]/nodes/[nodeId]]', error)
+    logApiError('PATCH /api/trees/[id]/nodes/[nodeId]', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }
@@ -125,6 +133,12 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
         createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
         { status: 401 }
       )
+    }
+
+    // Rate limit на удаление узлов.
+    const rateLimit = checkRateLimit(`node-delete:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit)
     }
 
     const { id: treeId, nodeId } = await params
@@ -158,7 +172,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse({ message: 'Node deleted' }))
   } catch (error) {
-    console.error('[DELETE /api/trees/[id]/nodes/[nodeId]]', error)
+    logApiError('DELETE /api/trees/[id]/nodes/[nodeId]', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

@@ -1,3 +1,4 @@
+import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -5,6 +6,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
+import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
 import { computeNextStreak } from '@/shared/lib/gamification'
 import { checkAndGrantAchievements } from '@/features/achievements/model/achievementService'
 
@@ -26,6 +28,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
         { status: 401 }
       )
+    }
+
+    // Rate limit на переключение прогресса: щедрый лимит (клики по узлам), но защита от спама.
+    const progressRateLimit = checkRateLimit(`progress:${session.user.id}`, WRITE_RATE_LIMIT_MS * 2)
+    if (!progressRateLimit.allowed) {
+      return rateLimitResponse(progressRateLimit)
     }
 
     const { id: treeId } = await params
@@ -154,7 +162,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       })
     )
   } catch (error) {
-    console.error('[POST /api/trees/[id]/progress]', error)
+    logApiError('POST /api/trees/[id]/progress', error)
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }
