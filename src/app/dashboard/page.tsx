@@ -56,7 +56,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Мои деревья</h1>
-            <p className="text-gray-400">Управляйте вашими навыками</p>
+            <p className="text-muted-foreground">Управляйте вашими навыками</p>
           </div>
           <Button asChild>
             <Link href="/tree/new">
@@ -73,10 +73,10 @@ export default function DashboardPage() {
         ) : trees.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-card border border-border rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-gray-500" />
+              <Lock className="w-8 h-8 text-text-tertiary" />
             </div>
             <h2 className="text-xl font-semibold mb-2">У вас пока нет деревьев</h2>
-            <p className="text-gray-400 mb-6">Создайте первое дерево или выберите публичное для изучения</p>
+            <p className="text-muted-foreground mb-6">Создайте первое дерево или выберите публичное для изучения</p>
             <Button asChild>
               <Link href="/tree/new">
                 <Plus className="w-5 h-5 mr-2" />

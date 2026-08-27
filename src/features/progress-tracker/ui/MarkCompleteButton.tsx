@@ -97,7 +97,7 @@ export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onTogg
       disabled={isLoading}
       variant={isFailed ? 'ghost' : 'secondary'}
       size="sm"
-      className={isFailed ? 'w-full text-red-400' : 'w-full'}
+      className={isFailed ? 'w-full text-destructive' : 'w-full'}
     >
       {isLoading ? (
         <Loader2 className="w-4 h-4 mr-2 animate-spin" />

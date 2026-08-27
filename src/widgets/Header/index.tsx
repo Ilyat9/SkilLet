@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
 import { Button } from '@/shared/ui/Button'
+import { ThemeToggle } from '@/shared/ui/ThemeToggle'
 import { Flame, LogOut } from 'lucide-react'
 
 interface StreakInfo {
@@ -41,7 +42,7 @@ function StreakBadge() {
 
   return (
     <span
-      className="flex items-center gap-1 text-sm text-orange-400 font-medium"
+      className="flex items-center gap-1 text-sm text-warning font-medium"
       title={`Серия изучения: ${streak.currentStreak} дн.`}
     >
       <Flame className="w-4 h-4" />
@@ -75,16 +76,17 @@ export function Header() {
           <nav className="flex items-center gap-4">
             {session?.user ? (
               <>
-                <Link href="/dashboard" className="text-gray-400 hover:text-foreground transition-colors">
+                <Link href="/dashboard" className="text-text-secondary hover:text-foreground transition-colors">
                   Дашборд
                 </Link>
-                <Link href="/explore" className="hidden sm:block text-gray-400 hover:text-foreground transition-colors">
+                <Link href="/explore" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors">
                   Каталог
                 </Link>
-                <Link href="/tree/new" className="hidden sm:block text-gray-400 hover:text-foreground transition-colors">
+                <Link href="/tree/new" className="hidden sm:block text-text-secondary hover:text-foreground transition-colors">
                   Создать дерево
                 </Link>
                 <div className="flex items-center gap-3 ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-border">
+                  <ThemeToggle />
                   <StreakBadge />
                   <Link href="/profile">
                     {session.user.image ? (
@@ -96,14 +98,14 @@ export function Header() {
                         className="w-8 h-8 rounded-full"
                       />
                     ) : (
-                      <span className="text-sm text-gray-400 hover:text-foreground transition-colors">Профиль</span>
+                      <span className="text-sm text-text-secondary hover:text-foreground transition-colors">Профиль</span>
                     )}
                   </Link>
                   <div className="hidden md:flex flex-col">
                     <span className="text-sm text-foreground">{session.user.name || session.user.email}</span>
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-400 transition-colors mt-1"
+                      className="flex items-center gap-1 text-xs text-text-secondary hover:text-destructive transition-colors mt-1"
                     >
                       <LogOut className="w-3 h-3" />
                       Выйти
@@ -111,7 +113,7 @@ export function Header() {
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="md:hidden p-1 text-gray-400 hover:text-red-400 transition-colors"
+                    className="md:hidden p-1 text-text-secondary hover:text-destructive transition-colors"
                     aria-label="Выйти"
                   >
                     <LogOut className="w-4 h-4" />

@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-foreground transition-colors mb-8"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
         >
           <ArrowLeft className="w-4 h-4" />
           На главную
@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="bg-card border border-border rounded-lg p-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold mb-2">Вход</h1>
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               Войдите через GitHub для доступа к платформе
             </p>
           </div>

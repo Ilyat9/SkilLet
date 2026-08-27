@@ -1,7 +1,15 @@
 @import "tailwindcss";
 
-/* Tailwind v4 theme: цвета и радиусы ссылаются на CSS-переменные,
-   объявленные ниже, поэтому поддерживают тёмную/светлую тему. */
+/*
+ * Дизайн-токены SkilLet (Tailwind v4).
+ * Все цвета ссылаются на CSS-переменные внизу файла:
+ * светлая тема объявлена в :root, тёмная — в .dark.
+ * Класс .dark ставится на <html> инлайн-скриптом до первого рендера (см. layout.tsx),
+ * поэтому переключение темы не требует правки компонентов.
+ *
+ * Все пары «фон/текст» проверены калькулятором WCAG-контраста (AA: ≥4.5 обычный текст,
+ * ≥3 крупный; токены accent/destructive/etc. как заливка бейджей также ≥4.5 к своему foreground).
+ */
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -13,54 +21,95 @@
   --color-card-foreground: hsl(var(--card-foreground));
   --color-border: hsl(var(--border));
 
-  --color-success: #4ade80;
-  --color-warning: #facc15;
-  --color-locked: #374151;
+  /* Приглушённая поверхность + текст на ней (подписи, вторичный текст). */
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  /* Акцент (янтарный): заливка бейджей/тостов, рамки доступных узлов. */
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  /* Более тёмный оттенок акцента для текста/иконок поверх фона страницы. */
+  --color-accent-strong: hsl(var(--accent-strong));
+
+  /* Семантические статусы. */
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  /* Серая шкала текста вместо прямых text-gray-*. */
+  --color-text-secondary: hsl(var(--text-secondary));
+  --color-text-tertiary: hsl(var(--text-tertiary));
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 }
 
+/* ---------- Светлая тема (по умолчанию) ---------- */
 :root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --primary: 142 76% 36%;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --primary: 142 72% 29%;            /* белый текст на primary: 4.86:1 */
   --primary-foreground: 210 40% 98%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
+  --secondary: 210 40% 94%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --border: 214.3 31.8% 87%;
+
+  --muted: 210 40% 95%;
+  --muted-foreground: 215.3 19% 35%; /* 7.58:1 на белом */
+
+  --accent: 43 100% 45%;             /* бейджи: navy-текст 6.74:1 */
+  --accent-foreground: 224 50% 12%;
+  --accent-strong: 28 90% 30%;       /* текст/иконки акцента: 5.5:1 на белом */
+
+  --destructive: 0 72% 51%;          /* белый текст: 4.83:1 */
+  --destructive-foreground: 0 0% 100%;
+  --success: 142 72% 29%;            /* белый текст: 4.86:1 */
+  --success-foreground: 210 40% 98%;
+  --warning: 43 96% 50%;             /* коричнево-чёрный текст: 6.9:1 */
+  --warning-foreground: 40 82% 7%;
+
+  --text-secondary: 215.3 19% 35%;   /* 7.58:1 на белом */
+  --text-tertiary: 216 16% 42%;      /* 5.5:1 на белом */
+
   --radius: 0.5rem;
 }
 
+/* ---------- Тёмная тема ---------- */
 .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
-  --primary: 142 76% 36%;
+  --primary: 142 70% 30%;            /* белый текст: 4.67:1 */
   --primary-foreground: 210 40% 98%;
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
+  --card: 222.2 47% 7%;
   --card-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --radius: 0.5rem;
-}
+  --border: 217.2 32.6% 18%;
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --primary: 142 76% 36%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 98%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --border: 214.3 31.8% 91.4%;
-    --radius: 0.5rem;
-  }
+  --muted: 217.2 32.6% 14%;
+  --muted-foreground: 215 20% 74%;   /* 8+:1 на фоне */
+
+  --accent: 43 96% 56%;              /* бейджи: navy-текст 8.64:1 */
+  --accent-foreground: 224 50% 12%;
+  --accent-strong: 43 96% 62%;       /* 12+:1 на тёмном фоне */
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 141 78% 55%;            /* тёмно-зелёный текст: 6.5:1 */
+  --success-foreground: 152 76% 8%;
+  --warning: 43 96% 56%;
+  --warning-foreground: 40 82% 7%;
+
+  --text-secondary: 213 27% 65%;     /* slate-400: 7.8:1 на фоне */
+  --text-tertiary: 218 16% 56%;      /* 5.7:1 на фоне */
+
+  --radius: 0.5rem;
 }
 
 body {
@@ -73,3 +122,4 @@ body {
     text-wrap: balance;
   }
 }
+

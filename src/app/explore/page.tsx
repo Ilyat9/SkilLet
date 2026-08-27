@@ -66,7 +66,7 @@ export default function ExplorePage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold mb-2">Каталог деревьев</h1>
-            <p className="text-gray-400">Публичные skill-деревья сообщества</p>
+            <p className="text-muted-foreground">Публичные skill-деревья сообщества</p>
           </div>
           <Button variant="secondary" onClick={() => router.push('/tree/new')}>
             Создать своё дерево
@@ -76,7 +76,7 @@ export default function ExplorePage() {
         {/* Поиск и сортировка */}
         <div className="flex flex-col md:flex-row gap-3 mb-8">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -98,7 +98,7 @@ export default function ExplorePage() {
                 className={`px-3 py-2 rounded-md text-sm border transition-colors ${
                   sortMode === option.id
                     ? 'border-primary text-primary'
-                    : 'border-border text-gray-400 hover:text-foreground'
+                    : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {option.label}
@@ -114,23 +114,23 @@ export default function ExplorePage() {
         ) : error ? (
           <div className="text-center py-12">
             <h2 className="text-xl font-semibold mb-2">Ошибка загрузки</h2>
-            <p className="text-gray-400">{error}</p>
+            <p className="text-muted-foreground">{error}</p>
           </div>
         ) : visibleTrees.length === 0 ? (
           /* Empty state: без данных вообще либо ничего не найдено по фильтру */
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-card border border-border rounded-full flex items-center justify-center mx-auto mb-4">
-              <Compass className="w-8 h-8 text-gray-500" />
+              <Compass className="w-8 h-8 text-text-tertiary" />
             </div>
             {searchQuery ? (
               <>
                 <h2 className="text-xl font-semibold mb-2">Ничего не найдено</h2>
-                <p className="text-gray-400">Попробуйте изменить поисковый запрос</p>
+                <p className="text-muted-foreground">Попробуйте изменить поисковый запрос</p>
               </>
             ) : (
               <>
                 <h2 className="text-xl font-semibold mb-2">Пока нет публичных деревьев</h2>
-                <p className="text-gray-400 mb-6">Создайте первое дерево и поделитесь им с сообществом</p>
+                <p className="text-muted-foreground mb-6">Создайте первое дерево и поделитесь им с сообществом</p>
                 <Button onClick={() => router.push('/tree/new')}>Создать дерево</Button>
               </>
             )}

@@ -127,7 +127,7 @@ export default function NewTreePage() {
       <div className="max-w-md w-full">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-foreground transition-colors mb-8"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
         >
           <ArrowLeft className="w-4 h-4" />
           Назад
@@ -136,7 +136,7 @@ export default function NewTreePage() {
         <div className="bg-card border border-border rounded-lg p-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold mb-2">Создать дерево</h1>
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               Создайте новое дерево навыков для ваших целей
             </p>
           </div>
@@ -159,7 +159,7 @@ export default function NewTreePage() {
                   'py-2 px-3 rounded-md text-sm font-medium transition-colors',
                   mode === tab.id
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-gray-400 hover:text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {tab.label}
@@ -218,7 +218,7 @@ export default function NewTreePage() {
                   )}
                 </Button>
                 {isGenerating && (
-                  <p className="text-xs text-gray-500 text-center">
+                  <p className="text-xs text-text-tertiary text-center">
                     Модель придумает 8–20 узлов со связями и ресурсами — останется только учиться.
                   </p>
                 )}
@@ -227,8 +227,8 @@ export default function NewTreePage() {
           </div>
 
           {(emptyError || aiError) && (
-            <div className="mt-4 p-3 bg-red-950/40 border border-red-800/50 rounded-lg">
-              <p className="text-red-400 text-sm">{emptyError ?? aiError}</p>
+            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/40 rounded-lg">
+              <p className="text-destructive text-sm">{emptyError ?? aiError}</p>
             </div>
           )}
         </div>
@@ -240,11 +240,11 @@ export default function NewTreePage() {
         title="Создать из шаблона"
       >
         <div className="space-y-4">
-          <p className="text-gray-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Выберите шаблон для быстрого старта. Дерево создастся полностью — с узлами и связями,
             и будет принадлежать вам.
           </p>
-          {templateError && <p className="text-red-400 text-sm">{templateError}</p>}
+          {templateError && <p className="text-destructive text-sm">{templateError}</p>}
           <div className="grid grid-cols-1 gap-3">
             {TEMPLATES.map((template) => {
               const isCreatingThis = creatingTemplateId === template.id
@@ -264,7 +264,7 @@ export default function NewTreePage() {
                       <Sparkles className="w-4 h-4 text-primary" />
                     )}
                   </div>
-                  <p className="text-sm text-gray-400">{template.description}</p>
+                  <p className="text-sm text-muted-foreground">{template.description}</p>
                 </button>
               )
             })}

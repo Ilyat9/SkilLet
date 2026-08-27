@@ -85,7 +85,7 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
   }
 
   const isInputClass =
-    'w-full bg-gray-800 border border-border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary'
+    'w-full bg-background border border-border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary'
 
   return (
     <div className="relative w-full h-full">
@@ -152,7 +152,7 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
                   maxLength={1000}
                   className={isInputClass}
                 />
-                <label className="flex items-center gap-2 text-xs text-gray-400">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   Сложность:
                   <input
                     type="range"
@@ -166,7 +166,7 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
 
                 {/* Ресурс: тип + URL + заголовок (сохраним только при заполнении всех полей). */}
                 <div className="border-t border-border pt-3 space-y-2">
-                  <p className="text-xs text-gray-400 font-medium">Ресурс (необязательно)</p>
+                  <p className="text-xs text-muted-foreground font-medium">Ресурс (необязательно)</p>
                   <select
                     value={resourceType}
                     onChange={(e) => setResourceType(e.target.value as '' | 'video' | 'article')}
@@ -195,7 +195,7 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
                       />
                       {(resourceUrl.trim() || resourceTitle.trim()) &&
                         (!resourceUrl.trim() || !resourceTitle.trim()) && (
-                          <p className="text-xs text-yellow-500">
+                          <p className="text-xs text-accent-strong">
                             Заполните и ссылку, и заголовок — иначе ресурс не сохранится.
                           </p>
                         )}

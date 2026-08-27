@@ -6,29 +6,43 @@ export const NODE_STATUS = {
 
 export type NodeStatus = (typeof NODE_STATUS)[keyof typeof NODE_STATUS]
 
-export const NODE_STATUS_CONFIG = {
+/**
+ * ЕДИНСТВЕННЫЙ источник правды для вида узла дерева.
+ * color/textColor — семантические Tailwind-классы, привязанные к дизайн-токенам
+ * темы (см. src/app/globals.css). Иконка — эмодзи-символ, одинаково читаемый
+ * в обеих темах; label — человекочитаемое название статуса для aria-label и легенды.
+ * SkillNode, CustomNode и легенда в SkillTreeViewer берут значения только отсюда.
+ */
+export const NODE_STATUS_CONFIG: Record<
+  NodeStatus,
+  { color: string; textColor: string; icon: string; label: string }
+> = {
   [NODE_STATUS.LOCKED]: {
-    color: 'border-gray-600 bg-gray-900',
-    textColor: 'text-gray-400',
+    color: 'border-border bg-muted/40',
+    textColor: 'text-muted-foreground',
     icon: '🔒',
+    label: 'заблокирован',
   },
   [NODE_STATUS.AVAILABLE]: {
-    color: 'border-yellow-500 bg-gray-800',
-    textColor: 'text-yellow-400',
+    color: 'border-accent bg-card/60',
+    textColor: 'text-accent-strong',
     icon: '⚡',
+    label: 'доступен',
   },
   [NODE_STATUS.DONE]: {
-    color: 'border-green-500 bg-gray-800',
-    textColor: 'text-green-400',
+    color: 'border-success bg-success/10',
+    textColor: 'text-success',
     icon: '✓',
+    label: 'пройден',
   },
-} as const
+}
 
-export const PROGRESS_BAR_COLORS = {
-  [NODE_STATUS.LOCKED]: 'bg-gray-600',
-  [NODE_STATUS.AVAILABLE]: 'bg-yellow-500',
-  [NODE_STATUS.DONE]: 'bg-green-500',
-} as const
+/** Порядок статусов для легенды и перебора. */
+export const NODE_STATUS_ORDER: readonly NodeStatus[] = [
+  NODE_STATUS.LOCKED,
+  NODE_STATUS.AVAILABLE,
+  NODE_STATUS.DONE,
+]
 
 /** Максимальное число узлов в одном дереве (защита от аномальных нагрузок на БД/UI). */
 export const MAX_NODES_PER_TREE = 100

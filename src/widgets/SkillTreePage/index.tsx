@@ -204,9 +204,9 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="bg-card border border-border rounded-lg p-8 max-w-md w-full text-center">
-          <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-4" />
+          <AlertTriangle className="w-10 h-10 text-warning mx-auto mb-4" />
           <h1 className="text-xl font-bold mb-2">{content.title}</h1>
-          <p className="text-gray-400 mb-6">{content.text}</p>
+          <p className="text-muted-foreground mb-6">{content.text}</p>
           <Button asChild className="w-full">
             <Link href="/dashboard">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -216,7 +216,7 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
           {loadError !== 'NOT_FOUND' && (
             <button
               onClick={() => void fetchTree()}
-              className="mt-3 text-sm text-gray-400 hover:text-foreground underline"
+              className="mt-3 text-sm text-muted-foreground hover:text-foreground underline"
             >
               Повторить попытку
             </button>
@@ -300,9 +300,9 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
         /* Пустое дерево: понятная заглушка с CTA для владельца. */
         <div className="h-full flex items-center justify-center">
           <div className="text-center max-w-md px-4">
-            <PlusCircle className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <PlusCircle className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">В дереве пока нет навыков</h2>
-            <p className="text-gray-400 mb-6">
+          <p className="text-muted-foreground mb-6">
               {isOwner
                 ? 'Добавьте первый узел и свяжите его с будущими — дальше дерево растёт само.'
                 : 'Автор ещё не наполнил это дерево навыками. Загляните позже!'}
@@ -370,13 +370,13 @@ function TreePageLayout({
       <div className="bg-card border-b border-border shrink-0">
         <div className="max-w-full px-3 sm:px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <Link href="/dashboard" className="p-2 rounded hover:bg-gray-700 transition-colors shrink-0">
+            <Link href="/dashboard" className="p-2 rounded hover:bg-secondary transition-colors shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-bold truncate">{tree.title}</h1>
               {tree.description && (
-                <p className="text-xs sm:text-sm text-gray-400 truncate">{tree.description}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">{tree.description}</p>
               )}
             </div>
           </div>
@@ -428,7 +428,7 @@ function TreePageLayout({
                     <button
                       onClick={() => setSidebarOpen(false)}
                       aria-label="Закрыть"
-                      className="p-1 rounded hover:bg-gray-700"
+                      className="p-1 rounded hover:bg-secondary"
                     >
                       <X className="w-5 h-5" />
                     </button>

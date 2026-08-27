@@ -27,7 +27,7 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect }: TreeCardProps)
       <div className="flex items-start justify-between mb-4">
         <h3 className="text-xl font-semibold text-foreground">{tree.title}</h3>
         {tree.author && (
-          <div className="flex items-center gap-2 text-sm text-gray-400">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <User className="w-4 h-4" />
             <span>{tree.author.name || 'Unknown'}</span>
           </div>
@@ -35,7 +35,7 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect }: TreeCardProps)
       </div>
 
       {tree.description && (
-        <p className="text-gray-400 mb-4 text-sm line-clamp-2">
+        <p className="text-muted-foreground mb-4 text-sm line-clamp-2">
           {tree.description}
         </p>
       )}
@@ -46,11 +46,11 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect }: TreeCardProps)
         ) : (
           <Badge variant="warning">Приватное</Badge>
         )}
-        <span className="text-gray-500 text-sm">
+        <span className="text-text-tertiary text-sm">
           {tree._count?.nodes || 0} навыков
         </span>
         {(tree._count?.progresses ?? 0) > 0 && (
-          <span className="text-orange-400 text-sm flex items-center gap-1" title="Сколько раз узлы дерева отмечены пройденными">
+          <span className="text-warning text-sm flex items-center gap-1" title="Сколько раз узлы дерева отмечены пройденными">
             🔥 {tree._count?.progresses}
           </span>
         )}

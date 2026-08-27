@@ -16,7 +16,8 @@ import '@xyflow/react/dist/style.css'
 import { CustomNode, type CustomFlowNode, type CustomNodeData } from './CustomNode'
 import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
 import type { Node as AppNode, Resource } from '@/entities/node/model/types'
-import type { NodeStatus } from '@/shared/constants'
+import { NODE_STATUS_CONFIG, NODE_STATUS_ORDER, type NodeStatus } from '@/shared/constants'
+import { cn } from '@/shared/lib/utils'
 import type { Edge as PrismaEdge } from '@prisma/client'
 
 // Кастомный тип узла для nodeTypes (нужен для типизации ReactFlow)
@@ -113,18 +114,18 @@ export function SkillTreeViewer({
             <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
               <h3 className="font-semibold text-sm mb-2">Легенда</h3>
               <div className="space-y-1 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 border-2 rounded bg-gray-900" />
-                  <span>Заблокирован</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 border-2 rounded bg-gray-800 border-yellow-500" />
-                  <span>Доступен</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 border-2 rounded bg-gray-800 border-green-500" />
-                  <span>Пройден</span>
-                </div>
+                {NODE_STATUS_ORDER.map((status) => {
+                  const config = NODE_STATUS_CONFIG[status]
+                  return (
+                    <div key={status} className="flex items-center gap-2">
+                      {/* Образец берёт классы прямо из NODE_STATUS_CONFIG — как сами узлы. */}
+                      <div className={cn('w-3 h-3 border-2 rounded bg-card', config.color)} aria-hidden />
+                      <span>
+                        {config.label.charAt(0).toUpperCase() + config.label.slice(1)}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </Panel>

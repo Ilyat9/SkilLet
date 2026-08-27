@@ -42,7 +42,7 @@ function buttonClasses(variant: string, size: string, className?: string): strin
     {
       'bg-primary text-primary-foreground hover:bg-primary/90': variant === 'primary',
       'bg-secondary text-secondary-foreground hover:bg-secondary/90': variant === 'secondary',
-      'hover:bg-gray-700': variant === 'ghost',
+      'hover:bg-secondary': variant === 'ghost',
     },
     {
       'h-9 px-4 py-2 text-sm': size === 'sm',

@@ -17,9 +17,9 @@ export function ProgressSidebar({ totalNodes, completedNodes }: ProgressSidebarP
     <div className="bg-card border border-border rounded-lg p-4">
       <div className="flex items-center gap-2 mb-3">
         {allCompleted ? (
-          <CheckCircle2 className="w-4 h-4 text-green-400" />
+          <CheckCircle2 className="w-4 h-4 text-success" />
         ) : (
-          <div className="w-4 h-4 rounded-full bg-gray-600" />
+          <div className="w-4 h-4 rounded-full bg-muted-foreground/40" />
         )}
         <h3 className="font-semibold">Прогресс</h3>
       </div>
@@ -27,7 +27,7 @@ export function ProgressSidebar({ totalNodes, completedNodes }: ProgressSidebarP
       <div className="space-y-4">
         <div>
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-gray-400">
+            <span className="text-muted-foreground">
               {completedNodes} из {totalNodes} навыков
             </span>
             <span className="text-foreground font-semibold">{percentage}%</span>
@@ -40,7 +40,7 @@ export function ProgressSidebar({ totalNodes, completedNodes }: ProgressSidebarP
             Все навыки пройдены! 🎉
           </Badge>
         ) : (
-          <div className="text-xs text-gray-400 text-center">
+          <div className="text-xs text-muted-foreground text-center">
             {completedNodes === 0 ? 'Начните с первого навыка' : 'Продолжайте обучение!'}
           </div>
         )}

@@ -1,10 +1,10 @@
 'use client'
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
-import { X, CheckCircle2, AlertCircle, Trophy } from 'lucide-react'
+import { X, CheckCircle2, AlertCircle, Trophy, Info } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 
-type ToastVariant = 'success' | 'error' | 'achievement'
+type ToastVariant = 'success' | 'error' | 'info' | 'achievement'
 
 interface ToastItem {
   id: number
@@ -30,9 +30,10 @@ export function useToast(): ToastContextValue {
 const AUTO_DISMISS_MS = 5000
 
 const VARIANT_CONFIG = {
-  success: { icon: CheckCircle2, classes: 'border-green-600/50 bg-card' },
-  error: { icon: AlertCircle, classes: 'border-red-600/50 bg-card' },
-  achievement: { icon: Trophy, classes: 'border-yellow-500/60 bg-yellow-950/80' },
+  success: { icon: CheckCircle2, classes: 'border-success/40 bg-card', iconColor: 'text-success' },
+  error: { icon: AlertCircle, classes: 'border-destructive/40 bg-card', iconColor: 'text-destructive' },
+  info: { icon: Info, classes: 'border-border bg-card', iconColor: 'text-muted-foreground' },
+  achievement: { icon: Trophy, classes: 'border-accent/60 bg-accent/10', iconColor: 'text-accent-strong' },
 } as const
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -59,7 +60,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {/* Контейнер тостов — поверх всего, включая модалки. */}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+      <div
+        className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm"
+        role="status"
+        aria-live="polite"
+      >
         {toasts.map((toast) => {
           const config = VARIANT_CONFIG[toast.variant]
           const Icon = config.icon
@@ -71,9 +76,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 config.classes
               )}
             >
-              <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', toast.variant === 'error' ? 'text-red-400' : toast.variant === 'achievement' ? 'text-yellow-400' : 'text-green-400')} />
-              <span className="text-foreground">{toast.message}</span>
-              <button onClick={() => removeToast(toast.id)} className="ml-auto text-gray-400 hover:text-foreground shrink-0">
+              <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', config.iconColor)} aria-hidden />
+              <span className="text-card-foreground">{toast.message}</span>
+              <button
+                onClick={() => removeToast(toast.id)}
+                aria-label="Закрыть уведомление"
+                className="ml-auto text-muted-foreground hover:text-foreground shrink-0"
+              >
                 <X className="w-3 h-3" />
               </button>
             </div>
