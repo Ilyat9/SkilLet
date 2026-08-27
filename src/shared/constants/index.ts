@@ -29,3 +29,10 @@ export const PROGRESS_BAR_COLORS = {
   [NODE_STATUS.AVAILABLE]: 'bg-yellow-500',
   [NODE_STATUS.DONE]: 'bg-green-500',
 } as const
+
+/** Максимальное число узлов в одном дереве (защита от аномальных нагрузок на БД/UI). */
+export const MAX_NODES_PER_TREE = 100
+
+/** Границы координат узлов — должны совпадать с ограничениями NodeSchema (zod). */
+export const NODE_POSITION_LIMIT = 1000
+

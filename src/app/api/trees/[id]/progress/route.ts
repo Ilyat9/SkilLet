@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
+import { parseJsonBody } from '@/shared/lib/api'
+import { computeNextStreak } from '@/shared/lib/gamification'
+import { checkAndGrantAchievements } from '@/features/achievements/model/achievementService'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,8 +30,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const { id: treeId } = await params
 
-    const body = await request.json()
-    const validation = ProgressSchema.safeParse(body)
+    const parsedBody = await parseJsonBody(request)
+    if (parsedBody.error) return parsedBody.error
+
+    const validation = ProgressSchema.safeParse(parsedBody.body)
 
     if (!validation.success) {
       return NextResponse.json(
@@ -104,7 +109,50 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       })
     }
 
-    return NextResponse.json(createSuccessResponse(progress))
+    const userId = session.user.id
+
+    // Streak обновляется только при отметке «пройдено» — снятие прогресса
+    // не должно ни продлевать, ни сбрасывать серию.
+    if (completed) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { lastActivityDate: true, currentStreak: true, longestStreak: true },
+      })
+
+      if (user) {
+        const nextStreak = computeNextStreak({
+          lastActivityDate: user.lastActivityDate,
+          currentStreak: user.currentStreak,
+          longestStreak: user.longestStreak,
+          today: new Date(),
+        })
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            lastActivityDate: nextStreak.lastActivityDate,
+            currentStreak: nextStreak.currentStreak,
+            longestStreak: nextStreak.longestStreak,
+          },
+        })
+      }
+    }
+
+    // Проверка достижений после сохранения прогресса.
+    const unlockedAchievements = completed ? await checkAndGrantAchievements(userId, treeId) : []
+
+    const streakState = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { currentStreak: true, longestStreak: true },
+    })
+
+    return NextResponse.json(
+      createSuccessResponse({
+        progress,
+        unlockedAchievements,
+        streak: streakState ?? { currentStreak: 0, longestStreak: 0 },
+      })
+    )
   } catch (error) {
     console.error('[POST /api/trees/[id]/progress]', error)
     return NextResponse.json(

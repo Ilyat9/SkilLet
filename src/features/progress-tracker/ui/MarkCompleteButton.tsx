@@ -7,6 +7,8 @@ import { Badge } from '@/shared/ui/Badge'
 import { Node } from '@/entities/node/model/types'
 import { NODE_STATUS } from '@/shared/constants'
 import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
+import { useToast } from '@/shared/ui/Toast'
+import type { Achievement } from '@prisma/client'
 import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface MarkCompleteButtonProps {
@@ -16,9 +18,17 @@ interface MarkCompleteButtonProps {
   onToggle: (completed: boolean) => void
 }
 
+interface ProgressApiResponse {
+  progress: unknown
+  streak: { currentStreak: number; longestStreak: number }
+  unlockedAchievements: Achievement[]
+}
+
 export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onToggle }: MarkCompleteButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isFailed, setIsFailed] = useState(false)
   const { data: session } = useAuth()
+  const { showToast } = useToast()
 
   if (!session?.user?.id) {
     return <Badge variant="warning">Войдите для прогресса</Badge>
@@ -26,6 +36,7 @@ export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onTogg
 
   const handleMarkComplete = async () => {
     setIsLoading(true)
+    setIsFailed(false)
     try {
       // treeId не передаём в body — сервер берёт его из URL.
       const response = await fetch(`/api/trees/${node.treeId}/progress`, {
@@ -39,14 +50,22 @@ export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onTogg
 
       const result = await response.json()
       if (result.error) {
-        alert(result.error.message)
+        setIsFailed(true)
+        showToast(result.error.message, 'error')
         return
       }
 
       onToggle(!isCompleted)
+
+      // Подтверждённые сервером разблокировки показываем тостами.
+      const payload = result.data as ProgressApiResponse
+      for (const achievement of payload.unlockedAchievements) {
+        showToast(`${achievement.icon} Достижение разблокировано: «${achievement.title}»`, 'achievement')
+      }
     } catch (error) {
       console.error('Ошибка при обновлении прогресса:', error)
-      alert('Ошибка обновления прогресса')
+      setIsFailed(true)
+      showToast('Ошибка обновления прогресса', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -76,16 +95,16 @@ export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onTogg
     <Button
       onClick={handleMarkComplete}
       disabled={isLoading}
-      variant="secondary"
+      variant={isFailed ? 'ghost' : 'secondary'}
       size="sm"
-      className="w-full"
+      className={isFailed ? 'w-full text-red-400' : 'w-full'}
     >
       {isLoading ? (
         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
       ) : (
         <CheckCircle2 className="w-4 h-4 mr-2" />
       )}
-      {isCompleted ? 'Отметить непройденным' : 'Отметить пройденным'}
+      {isFailed ? 'Повторить попытку' : 'Отметить пройденным'}
     </Button>
   )
 }

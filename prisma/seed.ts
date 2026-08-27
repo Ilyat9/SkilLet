@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { ACHIEVEMENT_DEFS } from '../src/shared/lib/gamification'
 
 const prisma = new PrismaClient()
 
@@ -109,6 +110,18 @@ const softSkillsTree: TreeSeed = {
 async function main() {
   console.log('🌱 Начало seed...')
 
+  // Каталог достижений — upsert по коду, чтобы повторные прогоны не ломались.
+  let achievementsSynced = 0
+  for (const def of ACHIEVEMENT_DEFS) {
+    await prisma.achievement.upsert({
+      where: { code: def.code },
+      update: { title: def.title, description: def.description, icon: def.icon },
+      create: { code: def.code, title: def.title, description: def.description, icon: def.icon },
+    })
+    achievementsSynced += 1
+  }
+  console.log(`🏆 Достижения синхронизированы: ${achievementsSynced}`)
+
   const author = await prisma.user.upsert({
     where: { email: 'demo@skillet.dev' },
     update: {},
@@ -120,6 +133,15 @@ async function main() {
   })
 
   console.log('👤 Создан пользователь:', author.name)
+
+  // Идемпотентность повторных прогонов: пересоздаём только сидируемые деревья
+  // демо-автора. Пользовательские данные (другие авторы) не затрагиваются.
+  const deletedStale = await prisma.tree.deleteMany({
+    where: { authorId: author.id },
+  })
+  if (deletedStale.count > 0) {
+    console.log(`🧹 Удалены устаревшие сидируемые деревья: ${deletedStale.count}`)
+  }
 
   const treesToSeed = [frontendTree, softSkillsTree]
 
@@ -208,14 +230,17 @@ async function main() {
   })
 
   // Финальная верификация.
-  const [nodeCount, edgeCount] = await Promise.all([
+  const [nodeCount, edgeCount, achievementTotal, userAchievementTotal] = await Promise.all([
     prisma.node.count(),
     prisma.edge.count(),
+    prisma.achievement.count(),
+    prisma.userAchievement.count(),
   ])
 
   console.log('🎉 Seed завершён успешно!')
   console.log(`📊 Всего в БД: узлов=${nodeCount}, рёбер=${edgeCount}`)
   console.log(`📊 Создано за прогон: узлов=${totalNodesCreated}, рёбер=${totalEdgesCreated}`)
+  console.log(`📊 Достижений в каталоге=${achievementTotal}, выдано пользователям=${userAchievementTotal}`)
 }
 
 main()

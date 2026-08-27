@@ -3,10 +3,52 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
 import { Button } from '@/shared/ui/Button'
-import { LogOut } from 'lucide-react'
+import { Flame, LogOut } from 'lucide-react'
+
+interface StreakInfo {
+  currentStreak: number
+}
+
+/** Иконка текущей серии дней рядом с профилем. Подтягивается один раз при маунте. */
+function StreakBadge() {
+  const [streak, setStreak] = useState<StreakInfo | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchStreak = async () => {
+      try {
+        const response = await fetch('/api/profile')
+        if (!response.ok) return
+        const result = await response.json()
+        if (!cancelled && result.data) {
+          setStreak({ currentStreak: result.data.stats.currentStreak as number })
+        }
+      } catch {
+        // В хедере ошибка загрузки streak некритична — просто не показываем бейдж.
+      }
+    }
+    void fetchStreak()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (!streak || streak.currentStreak < 1) return null
+
+  return (
+    <span
+      className="flex items-center gap-1 text-sm text-orange-400 font-medium"
+      title={`Серия изучения: ${streak.currentStreak} дн.`}
+    >
+      <Flame className="w-4 h-4" />
+      {streak.currentStreak}
+    </span>
+  )
+}
 
 export function Header() {
   const { data: session, status } = useAuth()
@@ -36,20 +78,28 @@ export function Header() {
                 <Link href="/dashboard" className="text-gray-400 hover:text-foreground transition-colors">
                   Дашборд
                 </Link>
-                <Link href="/tree/new" className="text-gray-400 hover:text-foreground transition-colors">
+                <Link href="/explore" className="hidden sm:block text-gray-400 hover:text-foreground transition-colors">
+                  Каталог
+                </Link>
+                <Link href="/tree/new" className="hidden sm:block text-gray-400 hover:text-foreground transition-colors">
                   Создать дерево
                 </Link>
-                <div className="flex items-center gap-3 ml-4 pl-4 border-l border-border">
-                  {session.user.image && (
-                    <Image
-                      src={session.user.image}
-                      alt={session.user.name || 'User'}
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 rounded-full"
-                    />
-                  )}
-                  <div className="flex flex-col">
+                <div className="flex items-center gap-3 ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-border">
+                  <StreakBadge />
+                  <Link href="/profile">
+                    {session.user.image ? (
+                      <Image
+                        src={session.user.image}
+                        alt={session.user.name || 'User'}
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 rounded-full"
+                      />
+                    ) : (
+                      <span className="text-sm text-gray-400 hover:text-foreground transition-colors">Профиль</span>
+                    )}
+                  </Link>
+                  <div className="hidden md:flex flex-col">
                     <span className="text-sm text-foreground">{session.user.name || session.user.email}</span>
                     <button
                       onClick={handleLogout}
@@ -59,6 +109,13 @@ export function Header() {
                       Выйти
                     </button>
                   </div>
+                  <button
+                    onClick={handleLogout}
+                    className="md:hidden p-1 text-gray-400 hover:text-red-400 transition-colors"
+                    aria-label="Выйти"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
                 </div>
               </>
             ) : (

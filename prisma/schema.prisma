@@ -8,17 +8,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  image         String?
-  githubId      String?   @unique
-  createdAt     DateTime  @default(now())
+  id               String    @id @default(cuid())
+  name             String?
+  email            String?   @unique
+  image            String?
+  githubId         String?   @unique
+  createdAt        DateTime  @default(now())
+
+  // Streak (серия дней активности)
+  lastActivityDate DateTime?
+  currentStreak    Int       @default(0)
+  longestStreak    Int       @default(0)
 
   trees         Tree[]
   progresses    UserProgress[]
   accounts      Account[]
   sessions      Session[]
+  achievements  UserAchievement[]
 }
 
 model Tree {
@@ -33,6 +39,7 @@ model Tree {
   author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   nodes       Node[]
+  edges       Edge[]
   progresses  UserProgress[]
 
   @@index([authorId])
@@ -61,6 +68,7 @@ model Node {
 model Edge {
   id       String @id @default(cuid())
   treeId   String
+  tree     Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
 
   sourceId String
   source   Node   @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
@@ -123,4 +131,32 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// Каталог достижений: содержимое задаётся сидированием (prisma/seed.ts),
+// код начисления — кодом достижения (code) в бизнес-логике.
+model Achievement {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  title       String
+  description String
+  icon        String
+
+  users UserAchievement[]
+
+  @@index([code])
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  unlockedAt    DateTime @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
 }
