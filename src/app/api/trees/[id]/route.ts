@@ -56,7 +56,10 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(createSuccessResponse(tree))
+    // Персонализированный ответ (прогресс текущего пользователя) — не кэшируется.
+    return NextResponse.json(createSuccessResponse(tree), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    })
   } catch (error) {
     logApiError('GET /api/trees/[id]', error, { requestId: getRequestId(request) })
     return NextResponse.json(

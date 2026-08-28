@@ -1,65 +1,72 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TreeCard } from '@/entities/tree/ui/TreeCard'
 import type { Tree } from '@/entities/tree/model/types'
 import { Button } from '@/shared/ui/Button'
 import { EmptyState } from '@/shared/ui/EmptyState'
-import { Search, Compass, AlertTriangle, SearchX } from 'lucide-react'
+import { Search, Compass, AlertTriangle, SearchX, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type SortMode = 'newest' | 'popular'
 
+interface TreesPage {
+  items: Tree[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+const PAGE_SIZE = 20
+
 export default function ExplorePage() {
   const router = useRouter()
-  const [trees, setTrees] = useState<Tree[]>([])
+  const [trees, setTrees] = useState<TreesPage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('popular')
+  const [page, setPage] = useState(1)
+
+  // Поиск и сортировка выполняются на сервере (пагинация делает клиентский
+  // фильтр по всем деревьям невозможным). Debounce 400мс на ввод.
+  const fetchPublicTrees = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams({
+        scope: 'public',
+        sort: sortMode,
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      })
+      if (searchQuery.trim()) params.set('search', searchQuery.trim())
+
+      const response = await fetch(`/api/trees?${params.toString()}`)
+      const result = await response.json()
+      if (result.error) {
+        setError(result.error.message)
+        return
+      }
+      setTrees(result.data as TreesPage)
+    } catch (err) {
+      console.error('Ошибка загрузки каталога:', err)
+      setError('Не удалось загрузить публичные деревья')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [searchQuery, sortMode, page])
 
   useEffect(() => {
-    const fetchPublicTrees = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await fetch('/api/trees?scope=public')
-        const result = await response.json()
-        if (result.error) {
-          setError(result.error.message)
-          return
-        }
-        setTrees(result.data as Tree[])
-      } catch (err) {
-        console.error('Ошибка загрузки каталога:', err)
-        setError('Не удалось загрузить публичные деревья')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    const timer = window.setTimeout(() => void fetchPublicTrees(), 400)
+    return () => window.clearTimeout(timer)
+  }, [fetchPublicTrees])
 
-    void fetchPublicTrees()
-  }, [])
-
-  // Клиентский поиск + сортировка — достаточно для MVP-каталога.
-  const visibleTrees = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-
-    const filtered = query
-      ? trees.filter(
-          (tree) =>
-            tree.title.toLowerCase().includes(query) ||
-            (tree.description ?? '').toLowerCase().includes(query)
-        )
-      : trees
-
-    const popularity = (tree: Tree) => tree._count?.progresses ?? 0
-    // createdAt приходит из JSON строкой — сравниваем как метки времени.
-    const createdMs = (tree: Tree) => new Date(tree.createdAt).getTime()
-    return [...filtered].sort((a, b) =>
-      sortMode === 'popular' ? popularity(b) - popularity(a) : createdMs(b) - createdMs(a)
-    )
-  }, [trees, searchQuery, sortMode])
+  const changeSort = (mode: SortMode) => {
+    setSortMode(mode)
+    setPage(1)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -80,7 +87,10 @@ export default function ExplorePage() {
             <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setPage(1)
+              }}
               placeholder="Поиск по названию или описанию…"
               className="w-full bg-card border border-border rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
@@ -95,7 +105,7 @@ export default function ExplorePage() {
               <button
                 key={option.id}
                 type="button"
-                onClick={() => setSortMode(option.id)}
+                onClick={() => changeSort(option.id)}
                 className={`px-3 py-2 rounded-md text-sm border transition-colors ${
                   sortMode === option.id
                     ? 'border-primary text-primary'
@@ -126,7 +136,7 @@ export default function ExplorePage() {
           </div>
         ) : error ? (
           <EmptyState icon={AlertTriangle} title="Ошибка загрузки" description={error} />
-        ) : visibleTrees.length === 0 ? (
+        ) : trees === null || trees.items.length === 0 ? (
           searchQuery ? (
             <EmptyState icon={SearchX} title="Ничего не найдено" description="Попробуйте изменить поисковый запрос" />
           ) : (
@@ -138,16 +148,45 @@ export default function ExplorePage() {
             />
           )
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleTrees.map((tree) => (
-              <TreeCard
-                key={tree.id}
-                tree={tree}
-                isPublic
-                onSelect={() => router.push(`/tree/${tree.id}`)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {trees.items.map((tree) => (
+                <TreeCard
+                  key={tree.id}
+                  tree={tree}
+                  isPublic
+                  onSelect={() => router.push(`/tree/${tree.id}`)}
+                />
+              ))}
+            </div>
+
+            {/* Пагинация: навигация видна только если страниц больше одной. */}
+            {trees.totalPages > 1 && (
+              <nav className="flex items-center justify-center gap-4 mt-10" aria-label="Постраничная навигация">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={trees.page <= 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Назад
+                </Button>
+                <span className="text-sm text-muted-foreground" aria-live="polite">
+                  Страница {trees.page} из {trees.totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setPage((p) => Math.min(trees.totalPages, p + 1))}
+                  disabled={trees.page >= trees.totalPages}
+                >
+                  Вперёд
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </nav>
+            )}
+          </>
         )}
       </div>
     </div>

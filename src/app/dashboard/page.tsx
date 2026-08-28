@@ -30,7 +30,8 @@ export default function DashboardPage() {
       const response = await fetch('/api/trees?scope=mine')
       const result = await response.json()
       if (result.data) {
-        setTrees(result.data)
+        // Листинг пагинирован: { items, page, total, ... }.
+        setTrees(result.data.items ?? [])
       }
     } catch (error) {
       console.error('Ошибка загрузки деревьев:', error)

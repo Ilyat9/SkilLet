@@ -12,7 +12,28 @@ import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+/** Пагинация каталога: дефолт и максимум на страницу. */
+const DEFAULT_PAGE_SIZE = 20
+const MAX_PAGE_SIZE = 100
+
+type TreeSortMode = 'newest' | 'popular'
+
+/**
+ * GET /api/trees — листинг деревьев с пагинацией.
+ *
+ * Параметры:
+ * - scope=public|mine (обязателен) — публичный каталог или «мои деревья»;
+ * - page (>=1, default 1), limit (1..100, default 20);
+ * - sort=newest|popular (default newest) — популярность по числу отметок прогресса;
+ * - search — поиск по названию/описанию (только для scope=public).
+ *
+ * Кэширование (осознанное решение, без отдельного кэш-слоя):
+ * - scope=public — умеренно динамичные данные: отдаём Cache-Control с
+ *   s-maxage=30 + stale-while-revalidate=120 (CDN/прокси держат короткий кэш);
+ * - scope=mine и всё персонализированное — no-store.
+ */
 export async function GET(request: NextRequest) {
+  const requestId = getRequestId(request)
   try {
     const { searchParams } = new URL(request.url)
     const scope = searchParams.get('scope')
@@ -28,7 +49,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    let where: { isPublic?: boolean; authorId?: string }
+    // Пагинация: page >= 1, limit 1..100 (защита от аномальных значений).
+    const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
+    const limitRaw = Number(searchParams.get('limit') ?? String(DEFAULT_PAGE_SIZE)) || DEFAULT_PAGE_SIZE
+    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, limitRaw))
+
+    const sort: TreeSortMode = searchParams.get('sort') === 'popular' ? 'popular' : 'newest'
+    const search = searchParams.get('search')?.trim() ?? ''
+
+    let where: { isPublic?: boolean; authorId?: string; OR?: Array<Record<string, unknown>> }
 
     if (scope === 'mine') {
       const session = await auth()
@@ -41,31 +70,68 @@ export async function GET(request: NextRequest) {
       where = { authorId: session.user.id }
     } else {
       where = { isPublic: true }
+      if (search) {
+        // Поиск выполняется на сервере: при пагинации клиентский фильтр
+        // «по всем деревьям» невозможен (видит только текущую страницу).
+        where.OR = [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ]
+      }
     }
 
-    const trees = await prisma.tree.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            nodes: true,
-            // Популярность дерева по ТЗ: количество UserProgress с completed=true.
-            progresses: { where: { completed: true } },
-            edges: true,
+    const [trees, total] = await prisma.$transaction([
+      prisma.tree.findMany({
+        where,
+        include: {
+          _count: {
+            select: {
+              nodes: true,
+              // Популярность дерева по ТЗ: количество UserProgress с completed=true.
+              progresses: { where: { completed: true } },
+              edges: true,
+            },
+          },
+          author: {
+            select: { id: true, name: true, image: true },
           },
         },
-        author: {
-          select: { id: true, name: true, image: true },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+        // newest → индекс Tree(isPublic, createdAt DESC).
+        // popular → агрегат по числу прогрессов (без фильтра completed: orderBy
+        // по отфильтрованному count в Prisma не поддерживается; на текущем
+        // масштабе разница несущественна, задокументировано в ARCHITECTURE.md).
+        orderBy:
+          sort === 'popular'
+            ? [{ progresses: { _count: 'desc' } }, { createdAt: 'desc' }]
+            : { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.tree.count({ where }),
+    ])
 
-    return NextResponse.json(createSuccessResponse(trees))
+    const response = NextResponse.json(
+      createSuccessResponse({
+        items: trees,
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      })
+    )
+
+    // Cache-Control выбирается по scope (см. док-комментарий выше).
+    response.headers.set(
+      'Cache-Control',
+      scope === 'public'
+        ? 'public, s-maxage=30, stale-while-revalidate=120'
+        : 'private, no-store'
+    )
+    response.headers.set('X-Request-Id', requestId)
+
+    return response
   } catch (error) {
-    logApiError('GET /api/trees', error, { requestId: getRequestId(request) })
+    logApiError('GET /api/trees', error, { requestId })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

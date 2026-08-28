@@ -31,6 +31,10 @@ export const dynamic = 'force-dynamic'
 
 /** Не чаще одной генерации в минуту на пользователя (in-memory TTL). */
 const RATE_LIMIT_INTERVAL_MS = 60_000
+/** Таймаут одного запроса к LLM — чтобы запрос не висел неопределённо. */
+const LLM_TIMEOUT_MS = 30_000
+/** Сообщение при таймауте LLM: пользовательский ответ маппится в 504. */
+const LLM_TIMEOUT_DESCRIPTION = 'AI-сервис не ответил за 30 секунд'
 
 /** Максимум попыток получить валидный JSON от модели. */
 const MAX_ATTEMPTS = 2
@@ -168,6 +172,8 @@ async function callLlm(topic: string, stricterInstruction?: string): Promise<str
       temperature: 0.7,
       response_format: { type: 'json_object' },
     }),
+    // Явный таймаут внешнего вызова: без него зависший провайдер держит запрос открытым.
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   })
 
   if (!response.ok) {
@@ -185,8 +191,11 @@ async function callLlm(topic: string, stricterInstruction?: string): Promise<str
 /**
  * Пытается получить валидное дерево от модели — не более MAX_ATTEMPTS попыток,
  * повторная выполняется с более строгим промтом и описанием ошибки первой.
+ * Таймаут внешнего вызова не ретраится — пользователь получает быстрый 504.
  */
-async function generateValidatedTree(topic: string): Promise<{ tree: AiTreeResponse } | { error: string }> {
+async function generateValidatedTree(
+  topic: string
+): Promise<{ tree: AiTreeResponse } | { error: string; timedOut?: boolean }> {
   let lastErrorDescription = ''
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -200,6 +209,10 @@ async function generateValidatedTree(topic: string): Promise<{ tree: AiTreeRespo
 
       lastErrorDescription = parsed.error.errors[0]?.message ?? 'ответ не соответствует схеме'
     } catch (error) {
+      // AbortSignal.timeout отклоняет fetch с DOMException TimeoutError.
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        return { error: LLM_TIMEOUT_DESCRIPTION, timedOut: true }
+      }
       lastErrorDescription = error instanceof Error ? error.message : 'неизвестная ошибка запроса к модели'
     }
   }
@@ -259,14 +272,16 @@ export async function POST(request: NextRequest) {
       logApiError('POST /api/ai/generate', generation.error, {
         requestId,
         userId,
-        detail: 'модель вернула невалидный ответ',
+        detail: generation.timedOut ? 'таймаут LLM' : 'модель вернула невалидный ответ',
       })
       return NextResponse.json(
         createErrorResponse(
-          'Модель не смогла вернуть корректное дерево. Попробуйте переформулировать тему.',
-          'AI_GENERATION_FAILED'
+          generation.timedOut
+            ? `${LLM_TIMEOUT_DESCRIPTION}. Попробуйте ещё раз позже.`
+            : 'Модель не смогла вернуть корректное дерево. Попробуйте переформулировать тему.',
+          generation.timedOut ? 'AI_TIMEOUT' : 'AI_GENERATION_FAILED'
         ),
-        { status: 502 }
+        { status: generation.timedOut ? 504 : 502 }
       )
     }
 
