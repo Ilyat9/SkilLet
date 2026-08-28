@@ -8,7 +8,7 @@ import { auth } from '@/shared/lib/auth'
 import { NodeUpdateSchema } from '@/entities/node/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,8 +47,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    // Rate limit на обновление узлов.
-    const rateLimit = checkRateLimit(`node-update:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    // Rate limit на обновление узлов (drag & drop координат — частый запрос).
+    const rateLimit = checkRateLimit(`node-update:${session.user.id}`, RATE_LIMITS.nodeUpdate)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }
@@ -145,7 +145,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     }
 
     // Rate limit на удаление узлов.
-    const rateLimit = checkRateLimit(`node-delete:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    const rateLimit = checkRateLimit(`node-delete:${session.user.id}`, RATE_LIMITS.nodeDelete)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }

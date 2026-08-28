@@ -9,7 +9,7 @@ import { validateEdge } from '@/shared/lib/dag'
 import { z } from 'zod'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
 
     // Rate limit на создание связей.
-    const rateLimit = checkRateLimit(`edge-create:${session.user.id}:${treeId}`, WRITE_RATE_LIMIT_MS)
+    const rateLimit = checkRateLimit(`edge-create:${session.user.id}:${treeId}`, RATE_LIMITS.edgeCreate)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }

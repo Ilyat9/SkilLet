@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     }
 
     // Rate limit на удаление связей.
-    const rateLimit = checkRateLimit(`edge-delete:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    const rateLimit = checkRateLimit(`edge-delete:${session.user.id}`, RATE_LIMITS.edgeDelete)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }

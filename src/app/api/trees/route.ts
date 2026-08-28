@@ -7,7 +7,7 @@ import { auth } from '@/shared/lib/auth'
 import { TreeCreateSchema } from '@/entities/tree/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit: не даём заспамить создание деревьев.
-    const rateLimit = checkRateLimit(`tree-create:${session.user.id}`, WRITE_RATE_LIMIT_MS)
+    const rateLimit = checkRateLimit(`tree-create:${session.user.id}`, RATE_LIMITS.treeCreate)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }

@@ -7,7 +7,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
-import { checkRateLimit } from '@/shared/lib/rateLimit'
+import { checkRateLimit, RATE_LIMITS } from '@/shared/lib/rateLimit'
 import { hasCycle } from '@/shared/lib/dag'
 import { NODE_POSITION_LIMIT } from '@/shared/constants'
 
@@ -29,8 +29,7 @@ import { NODE_POSITION_LIMIT } from '@/shared/constants'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/** Не чаще одной генерации в минуту на пользователя (in-memory TTL). */
-const RATE_LIMIT_INTERVAL_MS = 60_000
+/** Не чаще нескольких генераций в минуту на пользователя (см. RATE_LIMITS.aiGenerate). */
 /** Таймаут одного запроса к LLM — чтобы запрос не висел неопределённо. */
 const LLM_TIMEOUT_MS = 30_000
 /** Сообщение при таймауте LLM: пользовательский ответ маппится в 504. */
@@ -243,7 +242,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const rateLimit = checkRateLimit(`ai-generate:${userId}`, RATE_LIMIT_INTERVAL_MS)
+    const rateLimit = checkRateLimit(`ai-generate:${userId}`, RATE_LIMITS.aiGenerate)
     if (!rateLimit.allowed) {
       return NextResponse.json(
         createErrorResponse(

@@ -8,7 +8,7 @@ import { NodeCreateSchema } from '@/entities/node/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
 import { MAX_NODES_PER_TREE } from '@/shared/constants'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
 
     // Rate limit на массовое создание узлов.
-    const rateLimit = checkRateLimit(`node-create:${session.user.id}:${treeId}`, WRITE_RATE_LIMIT_MS)
+    const rateLimit = checkRateLimit(`node-create:${session.user.id}:${treeId}`, RATE_LIMITS.nodeCreate)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }

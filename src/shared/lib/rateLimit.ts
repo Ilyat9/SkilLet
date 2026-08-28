@@ -1,44 +1,55 @@
 /**
  * Rate limiting за явным интерфейсом.
  *
- * РЕШЕНИЕ: единственная реализация — InMemoryRateLimiter (TTL-бакеты).
- * ОГРАНИЧЕНИЕ (осознанный компромисс, не баг): in-memory реализация хранит
- * состояние в памяти процесса, поэтому при нескольких инстансах/процессах
- * приложения лимиты считаются раздельно и ослабляются в N раз.
- * Для текущего масштаба (один контейнер) это корректно. При горизонтальном
- * масштабировании нужно добавить Redis-backed реализацию RateLimiter
- * (например, фиксированное окно на INCR+EXPIRE) и вернуть её из getRateLimiter()
- * — вызывающий код в роутах менять не придётся.
+ * РЕШЕНИЕ: единственная реализация — InMemoryRateLimiter (fixed window counter:
+ * N запросов за интервал). ОГРАНИЧЕНИЕ (осознанный компромисс, не баг):
+ * in-memory реализация хранит состояние в памяти процесса, поэтому при
+ * нескольких инстансах/процессах приложения лимиты считаются раздельно
+ * и ослабляются в N раз. Для текущего масштаба (один контейнер) это корректно.
+ * При горизонтальном масштабировании нужно добавить Redis-backed реализацию
+ * RateLimiter (INCR + EXPIRE на то же семейство ключей) и вернуть её из
+ * getRateLimiter() — вызывающий код в роутах менять не придётся.
  */
+export interface RateLimitOptions {
+  /** Сколько запросов разрешено за окно. */
+  limit: number
+  /** Длина окна в мс. */
+  intervalMs: number
+}
+
 export interface RateLimitResult {
   allowed: boolean
-  /** Сколько мс осталось до следующей доступной попытки. */
+  /** Сколько мс осталось до следующей доступной попытки (0 — если разрешено). */
   retryAfterMs: number
 }
 
 export interface RateLimiter {
-  /** Проверяет и «списывает» одну попытку для ключа в пределах intervalMs. */
-  check(key: string, intervalMs: number): RateLimitResult
+  /** Проверяет и «списывает» одну попытку для ключа в пределах окна. */
+  check(key: string, options: RateLimitOptions): RateLimitResult
+}
+
+interface WindowBucket {
+  windowStart: number
+  hits: number
 }
 
 class InMemoryRateLimiter implements RateLimiter {
-  private buckets = new Map<string, number>()
+  private buckets = new Map<string, WindowBucket>()
 
-  check(key: string, intervalMs: number): RateLimitResult {
+  check(key: string, { limit, intervalMs }: RateLimitOptions): RateLimitResult {
     const now = Date.now()
+    const bucket = this.buckets.get(key)
 
-    for (const [existingKey, timestamp] of this.buckets) {
-      if (now - timestamp >= intervalMs) {
-        this.buckets.delete(existingKey)
-      }
+    if (!bucket || now - bucket.windowStart >= intervalMs) {
+      this.buckets.set(key, { windowStart: now, hits: 1 })
+      return { allowed: true, retryAfterMs: 0 }
     }
 
-    const lastRequestAt = this.buckets.get(key)
-    if (lastRequestAt !== undefined && now - lastRequestAt < intervalMs) {
-      return { allowed: false, retryAfterMs: intervalMs - (now - lastRequestAt) }
+    if (bucket.hits >= limit) {
+      return { allowed: false, retryAfterMs: intervalMs - (now - bucket.windowStart) }
     }
 
-    this.buckets.set(key, now)
+    bucket.hits += 1
     return { allowed: true, retryAfterMs: 0 }
   }
 }
@@ -53,12 +64,32 @@ export function getRateLimiter(): RateLimiter {
 
 const rateLimiter = getRateLimiter()
 
-/** Окно по умолчанию для мутаций деревьев/узлов/рёбер. */
-export const WRITE_RATE_LIMIT_MS = 60_000
+/**
+ * Пресеты лимитов: N запросов за окно на ключ (обычно userId[:treeId]).
+ * Подобраны так, чтобы не мешать обычной работе редактора (десятки мутаций
+ * в минуту), но блокировать спам/скриптовые атаки.
+ */
+export const RATE_LIMITS = {
+  /** Создание деревьев. */
+  treeCreate: { limit: 10, intervalMs: 60_000 },
+  /** Тяжёлое создание из шаблона (много узлов одной транзакцией). */
+  treeTemplate: { limit: 5, intervalMs: 60_000 },
+  /** Создание узлов (обычная работа редактора — десятки за минуту). */
+  nodeCreate: { limit: 60, intervalMs: 60_000 },
+  /** Обновление узлов (drag & drop координат идёт через PATCH). */
+  nodeUpdate: { limit: 120, intervalMs: 60_000 },
+  nodeDelete: { limit: 60, intervalMs: 60_000 },
+  edgeCreate: { limit: 60, intervalMs: 60_000 },
+  edgeDelete: { limit: 60, intervalMs: 60_000 },
+  /** Отметки прогресса: щедрый лимит (клики по узлам), защита от спама. */
+  progress: { limit: 60, intervalMs: 120_000 },
+  /** AI-генерация: дорогой внешний вызов — строже всех. */
+  aiGenerate: { limit: 3, intervalMs: 60_000 },
+} satisfies Record<string, RateLimitOptions>
 
-/** Фасад для существующих вызовов в роутах (см. интерфейс RateLimiter выше). */
-export function checkRateLimit(key: string, intervalMs: number): RateLimitResult {
-  return rateLimiter.check(key, intervalMs)
+/** Фасад для вызовов в роутах (см. интерфейс RateLimiter выше). */
+export function checkRateLimit(key: string, options: RateLimitOptions): RateLimitResult {
+  return rateLimiter.check(key, options)
 }
 
 /**

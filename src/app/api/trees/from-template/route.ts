@@ -7,7 +7,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 import { hasCycle } from '@/shared/lib/dag'
 import { MAX_NODES_PER_TREE } from '@/shared/constants'
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit: создание из шаблона тяжелее обычного создания — лимит строже.
-    const rateLimit = checkRateLimit(`tree-template:${session.user.id}`, WRITE_RATE_LIMIT_MS * 3)
+    const rateLimit = checkRateLimit(`tree-template:${session.user.id}`, RATE_LIMITS.treeTemplate)
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit)
     }

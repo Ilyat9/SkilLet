@@ -7,7 +7,7 @@ import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
-import { checkRateLimit, rateLimitResponse, WRITE_RATE_LIMIT_MS } from '@/shared/lib/rateLimit'
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
 import { computeNextStreak } from '@/shared/lib/gamification'
 import { checkAndGrantAchievements } from '@/features/achievements/model/achievementService'
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
 
     // Rate limit на переключение прогресса: щедрый лимит (клики по узлам), но защита от спама.
-    const progressRateLimit = checkRateLimit(`progress:${session.user.id}`, WRITE_RATE_LIMIT_MS * 2)
+    const progressRateLimit = checkRateLimit(`progress:${session.user.id}`, RATE_LIMITS.progress)
     if (!progressRateLimit.allowed) {
       return rateLimitResponse(progressRateLimit)
     }
