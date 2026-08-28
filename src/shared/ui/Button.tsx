@@ -14,7 +14,7 @@ import {
 import { cn } from '@/shared/lib/utils'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive'
   size?: 'sm' | 'md' | 'lg'
   /**
    * Slot-паттерн (аналог Radix `asChild`): рендерит переданного child
@@ -43,6 +43,7 @@ function buttonClasses(variant: string, size: string, className?: string): strin
       'bg-primary text-primary-foreground hover:bg-primary/90': variant === 'primary',
       'bg-secondary text-secondary-foreground hover:bg-secondary/90': variant === 'secondary',
       'hover:bg-secondary': variant === 'ghost',
+      'bg-destructive text-destructive-foreground hover:bg-destructive/90': variant === 'destructive',
     },
     {
       'h-9 px-4 py-2 text-sm': size === 'sm',

@@ -22,16 +22,16 @@ export async function GET(
     const tree = await prisma.tree.findUnique({
       where: { id: treeId },
       include: {
-        _count: { select: { nodes: true } },
+        _count: { select: { nodes: true, edges: true } },
         author: {
           select: { id: true, name: true, image: true },
         },
-        nodes: {
-          include: {
-            outgoingEdges: true,
-            incomingEdges: true,
-          },
-        },
+        nodes: true,
+        // Рёбра запрашиваются ОДИН раз на уровне дерева: каждое ребро ранее
+        // дублировалось в ответе дважды (как outgoingEdges источника и как
+        // incomingEdges цели). Клиент строит и граф ReactFlow, и статусы узлов
+        // (getNodeStatus) из этого единого массива edges.
+        edges: true,
         progresses: userId ? { where: { userId } } : false,
       },
     })
@@ -54,16 +54,7 @@ export async function GET(
       )
     }
 
-    const treeWithRelations = {
-      ...tree,
-      nodes: tree.nodes.map((node) => ({
-        ...node,
-        outgoingEdges: node.outgoingEdges,
-        incomingEdges: node.incomingEdges,
-      })),
-    }
-
-    return NextResponse.json(createSuccessResponse(treeWithRelations))
+    return NextResponse.json(createSuccessResponse(tree))
   } catch (error) {
     logApiError('GET /api/trees/[id]', error)
     return NextResponse.json(

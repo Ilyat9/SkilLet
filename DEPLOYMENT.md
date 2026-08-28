@@ -47,7 +47,7 @@ rate-limiting.
 docker build -t skillet .
 
 # 2. Применить схему и сиды к managed Postgres (однократно)
-DATABASE_URL="<neon-url>" npx prisma db push
+DATABASE_URL="<neon-url>" npx prisma migrate deploy
 DATABASE_URL="<neon-url>" npx prisma db seed   # необязательно
 
 # 3. Запустить
@@ -70,14 +70,14 @@ Next Auth v5 требует HTTPS вне localhost.
 docker-compose up --build -d        # postgres + миграции + приложение
 ```
 
-Миграции выполняет one-off сервис `migrate` (`npx prisma db push && npx prisma db seed`).
+Миграции выполняет one-off сервис `migrate` (`npx prisma migrate deploy && npx prisma db seed`).
 
 ## Сценарий C: Vercel (альтернатива)
 
 1. Убрать `output: 'standalone'` из `next.config.ts`.
 2. Импортировать репозиторий в Vercel (`vercel.json` уже есть).
 3. Выставить переменные из чеклиста в Project Settings → Environment Variables.
-4. Применить схему локально: `DATABASE_URL=<prod> npx prisma db push`.
+4. Применить схему локально: `DATABASE_URL=<prod> npx prisma migrate deploy`.
 5. Добавить prod callback URL в GitHub OAuth App.
 
 ---
@@ -144,7 +144,7 @@ gunzip -c /var/backups/skillet-2026-08-27.sql.gz | docker exec -i skillet-db psq
 git pull
 docker build -t skillet .
 docker stop skillet && docker rm skillet
-# повторить шаги 2–3 из Сценария A (prisma db push идемпотентен)
+# повторить шаги 2–3 из Сценария A (prisma migrate deploy идемпотентен)
 ```
 
 Даунтайм при таком апдейте — секунды; для 1–2 пользователей более чем приемлемо.

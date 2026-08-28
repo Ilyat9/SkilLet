@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { SkillTreeViewer } from '@/widgets/SkillTreeViewer'
 import { TreeEditor } from '@/features/tree-builder/ui/TreeEditor'
@@ -12,6 +13,7 @@ import Link from 'next/link'
 import { parseResources } from '@/entities/node/model/schemas'
 import { useToast } from '@/shared/ui/Toast'
 import { Button } from '@/shared/ui/Button'
+import { Modal } from '@/shared/ui/Modal'
 import { EmptyState } from '@/shared/ui/EmptyState'
 import {
   ArrowLeft,
@@ -21,12 +23,11 @@ import {
   PlusCircle,
   X,
   ListChecks,
+  Trash2,
 } from 'lucide-react'
 
 interface ApiNodeInput extends Omit<PrismaNode, 'resources'> {
   resources: unknown
-  outgoingEdges?: PrismaEdge[]
-  incomingEdges?: PrismaEdge[]
 }
 
 export interface AppTreeNode extends Omit<PrismaNode, 'resources'> {
@@ -36,14 +37,19 @@ export interface AppTreeNode extends Omit<PrismaNode, 'resources'> {
   incomingEdges: PrismaEdge[]
 }
 
-/** Приводит узлы из API к типовому виду приложения: resources Json → Resource[]. */
-function toAppNodes(apiNodes: ApiNodeInput[]): AppTreeNode[] {
+/**
+ * Приводит узлы из API к типовому виду приложения: resources Json → Resource[],
+ * а incoming/outgoing рёбра каждого узла вычисляются из ЕДИНОГО массива рёбер
+ * дерева (GET /api/trees/[id] возвращает edges на уровне дерева — без
+ * дублирования каждого ребра дважды в payload).
+ */
+function toAppNodes(apiNodes: ApiNodeInput[], treeEdges: PrismaEdge[]): AppTreeNode[] {
   return apiNodes.map((node) => ({
     ...node,
     description: node.description ?? null,
     resources: parseResources(node.resources),
-    outgoingEdges: node.outgoingEdges ?? [],
-    incomingEdges: node.incomingEdges ?? [],
+    outgoingEdges: treeEdges.filter((e) => e.sourceId === node.id),
+    incomingEdges: treeEdges.filter((e) => e.targetId === node.id),
   }))
 }
 
@@ -62,8 +68,9 @@ const LOAD_ERROR_CONTENT: Record<Exclude<LoadError, null>, { title: string; text
 export function SkillTreePage({ treeId }: { treeId: string }) {
   const { data: session, status } = useAuth()
   const { showToast } = useToast()
+  const router = useRouter()
 
-  const [tree, setTree] = useState<Tree | null>(null)
+  const [tree, setTree] = useState<(Tree & { _count?: { nodes: number; edges: number } }) | null>(null)
   const [nodes, setNodes] = useState<AppTreeNode[]>([])
   const [edges, setEdges] = useState<PrismaEdge[]>([])
   const [completedNodeIds, setCompletedNodeIds] = useState<Set<string>>(new Set())
@@ -72,6 +79,28 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
   const [loadError, setLoadError] = useState<LoadError>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isShareCopied, setIsShareCopied] = useState(false)
+  // Подтверждение удаления дерева: hard-delete каскадно стирает узлы, рёбра
+  // и весь прогресс — требуем явного подтверждения с перечислением последствий.
+  const [isDeleteTreeConfirmOpen, setIsDeleteTreeConfirmOpen] = useState(false)
+  const [isDeletingTree, setIsDeletingTree] = useState(false)
+
+  const handleDeleteTree = async () => {
+    setIsDeletingTree(true)
+    try {
+      const response = await fetch(`/api/trees/${treeId}`, { method: 'DELETE' })
+      const result = await response.json()
+      if (result.error) {
+        showToast(result.error.message ?? 'Не удалось удалить дерево', 'error')
+        return
+      }
+      showToast('Дерево удалено', 'success')
+      router.push('/dashboard')
+    } catch {
+      showToast('Ошибка удаления дерева', 'error')
+    } finally {
+      setIsDeletingTree(false)
+    }
+  }
 
   const isOwner = Boolean(session?.user?.id && tree && session.user.id === tree.authorId)
 
@@ -93,12 +122,15 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
 
       const treeData = result.data as Tree & {
         nodes?: ApiNodeInput[]
+        edges?: PrismaEdge[]
         progresses?: Array<{ nodeId: string; completed: boolean }>
       }
 
+      // Рёбра — единственный источник: массив на уровне дерева.
+      const treeEdges: PrismaEdge[] = treeData.edges ?? []
       setTree(treeData)
-      setNodes(toAppNodes(treeData.nodes ?? []))
-      setEdges((treeData.nodes ?? []).flatMap((n) => n.outgoingEdges ?? []))
+      setNodes(toAppNodes(treeData.nodes ?? [], treeEdges))
+      setEdges(treeEdges)
 
       const completedIds = new Set<string>(
         (treeData.progresses ?? []).filter((p) => p.completed).map((p) => p.nodeId)
@@ -319,6 +351,11 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       sidebarOpen={isSidebarOpen}
       setSidebarOpen={(value) => setIsSidebarOpen(value)}
       sidebarContent={sidebarContent}
+      onDeleteTree={() => setIsDeleteTreeConfirmOpen(true)}
+      isDeletingTree={isDeletingTree}
+      isDeleteTreeConfirmOpen={isDeleteTreeConfirmOpen}
+      setIsDeleteTreeConfirmOpen={setIsDeleteTreeConfirmOpen}
+      onConfirmDeleteTree={() => void handleDeleteTree()}
     >
       {/* Содержимое основной области */}
       {!isEditMode && totalNodes === 0 ? (
@@ -365,8 +402,10 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
 }
 
 /** Разметка страницы: тулбар, основная область, desktop-сайдбар и mobile-drawer. */
+type TreeWithCount = Tree & { _count?: { nodes: number; edges: number } }
+
 interface TreePageLayoutProps {
-  tree: Tree
+  tree: TreeWithCount
   isOwner: boolean
   isEditMode: boolean
   setIsEditMode: (value: boolean) => void
@@ -376,6 +415,11 @@ interface TreePageLayoutProps {
   setSidebarOpen: (value: boolean) => void
   sidebarContent: React.ReactNode
   children: React.ReactNode
+  onDeleteTree: () => void
+  isDeletingTree: boolean
+  isDeleteTreeConfirmOpen: boolean
+  setIsDeleteTreeConfirmOpen: (value: boolean) => void
+  onConfirmDeleteTree: () => void
 }
 
 function TreePageLayout({
@@ -389,6 +433,11 @@ function TreePageLayout({
   setSidebarOpen,
   sidebarContent,
   children,
+  onDeleteTree,
+  isDeletingTree,
+  isDeleteTreeConfirmOpen,
+  setIsDeleteTreeConfirmOpen,
+  onConfirmDeleteTree,
 }: TreePageLayoutProps) {
   return (
     <div className="h-screen bg-background flex flex-col">
@@ -415,10 +464,21 @@ function TreePageLayout({
               </Button>
             )}
             {isOwner && (
-              <Button size="sm" variant={isEditMode ? 'secondary' : 'ghost'} onClick={() => setIsEditMode(!isEditMode)}>
-                <PencilLine className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">{isEditMode ? 'Закрыть редактор' : 'Редактор'}</span>
-              </Button>
+              <>
+                <Button size="sm" variant={isEditMode ? 'secondary' : 'ghost'} onClick={() => setIsEditMode(!isEditMode)}>
+                  <PencilLine className="w-4 h-4 mr-1" />
+                  <span className="hidden sm:inline">{isEditMode ? 'Закрыть редактор' : 'Редактор'}</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onDeleteTree}
+                  aria-label="Удалить дерево"
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -467,6 +527,36 @@ function TreePageLayout({
           </>
         )}
       </div>
+
+      {/* Подтверждение удаления дерева: перечисляем всё, что стирается каскадно. */}
+      <Modal
+        isOpen={isDeleteTreeConfirmOpen}
+        onClose={() => setIsDeleteTreeConfirmOpen(false)}
+        title="Удалить дерево?"
+      >
+        <p className="text-sm text-muted-foreground mb-4">
+          Дерево <span className="font-semibold text-foreground">«{tree.title}»</span> будет удалено
+          безвозвратно. Вместе с ним удалятся:
+        </p>
+        <ul className="text-sm list-disc pl-5 mb-4 space-y-1">
+          <li>
+            узлов: <span className="font-semibold">{tree._count?.nodes ?? '—'}</span>
+          </li>
+          <li>
+            связей между ними: <span className="font-semibold">{tree._count?.edges ?? '—'}</span>
+          </li>
+          <li>все отметки прогресса всех пользователей по этому дереву</li>
+        </ul>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setIsDeleteTreeConfirmOpen(false)}>
+            Отмена
+          </Button>
+          <Button size="sm" variant="destructive" onClick={onConfirmDeleteTree} disabled={isDeletingTree}>
+            <Trash2 className="w-4 h-4 mr-1" />
+            {isDeletingTree ? 'Удаляем…' : 'Удалить безвозвратно'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

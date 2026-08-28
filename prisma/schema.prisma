@@ -43,7 +43,10 @@ model Tree {
   progresses  UserProgress[]
 
   @@index([authorId])
-  @@index([isPublic])
+  // GET /api/trees?scope=public: WHERE isPublic = true ORDER BY createdAt DESC
+  // (публичный каталог /explore с сортировкой «по дате»). Составной индекс
+  // покрывает и фильтр по isPublic, поэтому одиночный @@index([isPublic]) удалён.
+  @@index([isPublic, createdAt(sort: Desc)])
 }
 
 model Node {
@@ -95,6 +98,11 @@ model UserProgress {
   node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, nodeId])
+  // Подсчёт статистики профиля и streak (GET /api/profile, сервис достижений):
+  // count({ where: { userId, completed: true } }) — фильтр по префиксу userId
+  // + фильтр по completed без обращения к таблице.
+  @@index([userId, completed])
+  // Прогресс по конкретному дереву (checkAndGrantAchievements: treeId + userId).
   @@index([userId, treeId])
 }
 

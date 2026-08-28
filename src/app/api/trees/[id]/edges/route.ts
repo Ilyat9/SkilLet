@@ -1,6 +1,7 @@
 import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { validateEdge } from '@/shared/lib/dag'
@@ -18,6 +19,69 @@ const EdgeCreateSchema = z.object({
   sourceId: z.string().min(1, 'sourceId обязателен'),
   targetId: z.string().min(1, 'targetId обязателен'),
 })
+
+/** Сколько раз повторяем транзакцию при serialization failure (гонка параллельных рёбер). */
+const MAX_TRANSACTION_RETRIES = 3
+
+type CreateEdgeResult =
+  | { ok: true; edge: { id: string; treeId: string; sourceId: string; targetId: string } }
+  | { ok: false; code: 'CYCLE_OR_DUPLICATE' | 'CONFLICT' }
+
+/**
+ * Валидация DAG + создание ребра в ОДНОЙ Serializable-транзакции.
+ *
+ * Зачем: validateEdge читает существующие рёбра ДО вставки — при двух
+ * параллельных запросах оба могут пройти валидацию независимо и вместе
+ * создать цикл (TOCTOU). Serializable-изоляция заставляет Postgres прервать
+ * одну из конкурирующих транзакций (P2034), поэтому инвариант DAG не нарушается
+ * на уровне БД, а не «на удачу» между чтением и записью.
+ * Дубликат ребра дополнительно защищён @@unique([sourceId, targetId]) (P2002).
+ */
+async function createEdgeTransactionally(
+  treeId: string,
+  sourceId: string,
+  targetId: string
+): Promise<CreateEdgeResult> {
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const existingEdges = await tx.edge.findMany({
+            where: { treeId },
+            select: { sourceId: true, targetId: true, treeId: true },
+          })
+
+          // validateEdge проверяет: самопетлю, дубликат ребра и цикл в DAG.
+          const edgeValidation = validateEdge(existingEdges, treeId, sourceId, targetId)
+          if (!edgeValidation.valid) {
+            return { ok: false as const, code: 'CYCLE_OR_DUPLICATE' as const }
+          }
+
+          const edge = await tx.edge.create({
+            data: { treeId, sourceId, targetId },
+          })
+          return { ok: true as const, edge }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+    } catch (error) {
+      // P2034 — serialization failure / write conflict при параллельной транзакции:
+      // повторяем попытку (валидация перечитает рёбра уже с учётом конкурента).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        if (attempt === MAX_TRANSACTION_RETRIES) {
+          return { ok: false, code: 'CONFLICT' }
+        }
+        continue
+      }
+      // P2002 — уникальный constraint (sourceId, targetId): дубликат ребра.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return { ok: false, code: 'CYCLE_OR_DUPLICATE' }
+      }
+      throw error
+    }
+  }
+  return { ok: false, code: 'CONFLICT' }
+}
 
 // POST /api/trees/[id]/edges — создание ребра между узлами одного дерева
 export async function POST(request: NextRequest, { params }: RouteContext) {
@@ -72,8 +136,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     // Оба узла должны существовать и принадлежать этому дереву.
     const [source, target] = await Promise.all([
-      prisma.node.findUnique({ where: { id: sourceId } }),
-      prisma.node.findUnique({ where: { id: targetId } }),
+      prisma.node.findUnique({ where: { id: sourceId }, select: { id: true, treeId: true } }),
+      prisma.node.findUnique({ where: { id: targetId }, select: { id: true, treeId: true } }),
     ])
 
     if (!source || source.treeId !== treeId) {
@@ -90,29 +154,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const existingEdges = await prisma.edge.findMany({
-      where: { treeId },
-      select: { sourceId: true, targetId: true, treeId: true },
-    })
+    // Валидация DAG + вставка — атомарно (см. комментарий к createEdgeTransactionally):
+    // параллельные запросы не могут вместе создать цикл.
+    const result = await createEdgeTransactionally(treeId, sourceId, targetId)
 
-    // validateEdge проверяет: самопетлю, дубликат ребра и цикл в DAG.
-    const edgeValidation = validateEdge(existingEdges, treeId, sourceId, targetId)
-    if (!edgeValidation.valid) {
+    if (!result.ok) {
       return NextResponse.json(
-        createErrorResponse(edgeValidation.error ?? 'Invalid edge', 'VALIDATION_ERROR'),
-        { status: 400 }
+        createErrorResponse(
+          result.code === 'CONFLICT'
+            ? 'Конфликт параллельного изменения дерева, попробуйте ещё раз'
+            : 'Связь не может быть создана: дубликат или цикл в графе',
+          result.code === 'CONFLICT' ? 'CONFLICT' : 'VALIDATION_ERROR'
+        ),
+        { status: result.code === 'CONFLICT' ? 409 : 400 }
       )
     }
 
-    const edge = await prisma.edge.create({
-      data: {
-        treeId,
-        sourceId,
-        targetId,
-      },
-    })
-
-    return NextResponse.json(createSuccessResponse(edge), { status: 201 })
+    return NextResponse.json(createSuccessResponse(result.edge), { status: 201 })
   } catch (error) {
     logApiError('POST /api/trees/[id]/edges', error)
     return NextResponse.json(

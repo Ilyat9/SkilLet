@@ -133,7 +133,7 @@
 git clone https://github.com/Ilyat9/SkilLet.git && cd SkilLet
 cp .env.example .env            # заполните AUTH_*, GITHUB_* ключи
 docker-compose up -d postgres   # поднять PostgreSQL
-npx prisma db push && npx prisma db seed
+npx prisma migrate dev && npx prisma db seed
 npm run dev                     # http://localhost:3000
 ```
 
@@ -168,8 +168,9 @@ npm run test       # юнит-тесты (vitest)
 npm run format     # форматирование кода
 
 # Prisma
-npx prisma studio   # GUI база данных
-npx prisma migrate dev  # миграции
+npx prisma studio       # GUI база данных
+npm run db:migrate      # локальные миграции (prisma migrate dev)
+npm run db:deploy       # применить миграции к прод-БД (prisma migrate deploy)
 npx prisma db seed      # seed данные
 ```
 

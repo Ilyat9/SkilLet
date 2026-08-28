@@ -5,6 +5,7 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Panel } fr
 import { useTreeEditor, type EditorNode, type EditorEdge } from '@/features/tree-builder/model/useTreeEditor'
 import { Button } from '@/shared/ui/Button'
 import { Badge } from '@/shared/ui/Badge'
+import { Modal } from '@/shared/ui/Modal'
 import { Loader2, Plus, Trash2, Save, Eye } from 'lucide-react'
 
 interface TreeEditorProps {
@@ -29,6 +30,9 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
   // Индикатор «Сохранено»: показывается на 2с после успешной мутации.
   const [showSaved, setShowSaved] = useState(false)
   const wasLoadingRef = useRef(false)
+  // Подтверждение удаления узла: операция необратима и каскадно стирает
+  // связи и прогресс — требуем явного подтверждения (hard-delete по дизайну).
+  const [isDeleteNodeConfirmOpen, setIsDeleteNodeConfirmOpen] = useState(false)
   useEffect(() => {
     if (wasLoadingRef.current && !editor.isLoading && !editor.error) {
       setShowSaved(true)
@@ -84,10 +88,16 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
 
   const handleDeleteSelectedNode = async () => {
     if (!selectedNodeId) return
+    setIsDeleteNodeConfirmOpen(false)
     await editor.deleteNode(selectedNodeId)
     setSelectedNodeId(null)
     onChanged?.()
   }
+
+  // Сколько связей удалится вместе с узлом (рёбра удаляются каскадно).
+  const deleteNodeEdgeCount = selectedNodeId
+    ? editor.edges.filter((e) => e.source === selectedNodeId || e.target === selectedNodeId).length
+    : 0
 
   const handleDeleteSelectedEdge = async () => {
     if (!selectedEdgeId) return
@@ -235,7 +245,7 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
                     size="sm"
                     variant="secondary"
                     disabled={isSelectedNodeBusy}
-                    onClick={() => void handleDeleteSelectedNode()}
+                    onClick={() => setIsDeleteNodeConfirmOpen(true)}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
                     Удалить
@@ -261,6 +271,33 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
         </div>
       )}
+
+      {/* Подтверждение удаления узла с явным перечислением каскадных последствий. */}
+      <Modal
+        isOpen={isDeleteNodeConfirmOpen && Boolean(selectedNodeId)}
+        onClose={() => setIsDeleteNodeConfirmOpen(false)}
+        title="Удалить навык?"
+      >
+        <p className="text-sm text-muted-foreground mb-4">
+          Навык <span className="font-semibold text-foreground">«{selectedNode?.data.title}»</span> будет
+          удалён безвозвратно. Вместе с ним удалятся:
+        </p>
+        <ul className="text-sm list-disc pl-5 mb-4 space-y-1">
+          <li>
+            связей с другими навыками: <span className="font-semibold">{deleteNodeEdgeCount}</span>
+          </li>
+          <li>все отметки прогресса по этому навыку у всех пользователей</li>
+        </ul>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setIsDeleteNodeConfirmOpen(false)}>
+            Отмена
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => void handleDeleteSelectedNode()}>
+            <Trash2 className="w-4 h-4 mr-1" />
+            Удалить безвозвратно
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }
