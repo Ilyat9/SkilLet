@@ -1,4 +1,5 @@
-import { logApiError } from '@/shared/lib/logger'
+import { logApiError, logEvent } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(createSuccessResponse(trees))
   } catch (error) {
-    logApiError('GET /api/trees', error)
+    logApiError('GET /api/trees', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }
@@ -115,9 +116,16 @@ export async function POST(request: NextRequest) {
       return tree
     })
 
+    // Бизнес-событие для будущей аналитики (см. logEvent в shared/lib/logger).
+    logEvent('tree_created', {
+      userId: session.user.id,
+      treeId: result.id,
+      requestId: getRequestId(request),
+    })
+
     return NextResponse.json(createSuccessResponse(result), { status: 201 })
   } catch (error) {
-    logApiError('POST /api/trees', error)
+    logApiError('POST /api/trees', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

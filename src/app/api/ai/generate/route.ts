@@ -1,4 +1,5 @@
-import { logApiError } from '@/shared/lib/logger'
+import { logApiError, logEvent } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -209,6 +210,7 @@ async function generateValidatedTree(topic: string): Promise<{ tree: AiTreeRespo
 // POST /api/ai/generate — генерация дерева навыков по теме через LLM.
 export async function POST(request: NextRequest) {
   try {
+    const requestId = getRequestId(request)
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -254,7 +256,11 @@ export async function POST(request: NextRequest) {
     const generation = await generateValidatedTree(topic)
 
     if ('error' in generation) {
-      logApiError('POST /api/ai/generate', generation.error, { detail: 'модель вернула невалидный ответ' })
+      logApiError('POST /api/ai/generate', generation.error, {
+        requestId,
+        userId,
+        detail: 'модель вернула невалидный ответ',
+      })
       return NextResponse.json(
         createErrorResponse(
           'Модель не смогла вернуть корректное дерево. Попробуйте переформулировать тему.',
@@ -317,12 +323,20 @@ export async function POST(request: NextRequest) {
       return tree.id
     })
 
+    logEvent('ai_tree_generated', {
+      userId,
+      treeId,
+      nodesCount: aiTree.nodes.length,
+      topicLength: topic.length,
+      requestId,
+    })
+
     return NextResponse.json(
       createSuccessResponse({ treeId, nodesCount: aiTree.nodes.length }),
       { status: 201 }
     )
   } catch (error) {
-    logApiError('POST /api/ai/generate', error)
+    logApiError('POST /api/ai/generate', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Ошибка AI-генерации', 'INTERNAL_ERROR'),
       { status: 500 }

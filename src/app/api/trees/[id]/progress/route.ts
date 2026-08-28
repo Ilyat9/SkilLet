@@ -1,4 +1,5 @@
-import { logApiError } from '@/shared/lib/logger'
+import { logApiError, logEvent } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -149,6 +150,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     // Проверка достижений после сохранения прогресса.
     const unlockedAchievements = completed ? await checkAndGrantAchievements(userId, treeId) : []
 
+    // Бизнес-события для аналитики: отметка прогресса и разблокировка достижений.
+    logEvent('progress_marked', {
+      userId,
+      treeId,
+      nodeId,
+      completed,
+      requestId: getRequestId(request),
+    })
+    if (unlockedAchievements.length > 0) {
+      logEvent('achievement_unlocked', {
+        userId,
+        treeId,
+        codes: unlockedAchievements.map((a) => a.code),
+        requestId: getRequestId(request),
+      })
+    }
+
     const streakState = await prisma.user.findUnique({
       where: { id: userId },
       select: { currentStreak: true, longestStreak: true },
@@ -162,7 +180,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       })
     )
   } catch (error) {
-    logApiError('POST /api/trees/[id]/progress', error)
+    logApiError('POST /api/trees/[id]/progress', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

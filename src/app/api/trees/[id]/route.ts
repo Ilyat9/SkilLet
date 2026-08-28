@@ -1,4 +1,5 @@
 import { logApiError } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
@@ -57,7 +58,7 @@ export async function GET(
 
     return NextResponse.json(createSuccessResponse(tree))
   } catch (error) {
-    logApiError('GET /api/trees/[id]', error)
+    logApiError('GET /api/trees/[id]', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }
@@ -119,7 +120,7 @@ export async function PATCH(
 
     return NextResponse.json(createSuccessResponse(result))
   } catch (error) {
-    logApiError('PATCH /api/trees/[id]', error)
+    logApiError('PATCH /api/trees/[id]', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }
@@ -160,7 +161,7 @@ export async function DELETE(
 
     return NextResponse.json(createSuccessResponse({ message: 'Tree deleted' }))
   } catch (error) {
-    logApiError('DELETE /api/trees/[id]', error)
+    logApiError('DELETE /api/trees/[id]', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

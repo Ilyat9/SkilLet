@@ -1,4 +1,5 @@
 import { logApiError } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse(node), { status: 201 })
   } catch (error) {
-    logApiError('POST /api/trees/[id]/nodes', error)
+    logApiError('POST /api/trees/[id]/nodes', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

@@ -1,4 +1,5 @@
 import { logApiError } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
@@ -66,7 +67,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json(createSuccessResponse({ message: 'Edge deleted' }))
   } catch (error) {
-    logApiError('DELETE /api/trees/[id]/edges/[edgeId]', error)
+    logApiError('DELETE /api/trees/[id]/edges/[edgeId]', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

@@ -1,4 +1,5 @@
-import { logApiError } from '@/shared/lib/logger'
+import { logApiError, logEvent } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -135,12 +136,21 @@ export async function POST(request: NextRequest) {
       return createdTree
     })
 
+    logEvent('tree_created', {
+      userId: session.user.id,
+      treeId: tree.id,
+      source: 'template',
+      nodesCount: nodes.length,
+      edgesCount: acceptedEdges.length,
+      requestId: getRequestId(request),
+    })
+
     return NextResponse.json(
       createSuccessResponse({ id: tree.id, nodesCount: nodes.length, edgesCount: acceptedEdges.length }),
       { status: 201 }
     )
   } catch (error) {
-    logApiError('POST /api/trees/from-template', error)
+    logApiError('POST /api/trees/from-template', error, { requestId: getRequestId(request) })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }

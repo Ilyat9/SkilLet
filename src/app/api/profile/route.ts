@@ -1,6 +1,7 @@
 import { logApiError } from '@/shared/lib/logger'
+import { getRequestId } from '@/shared/lib/requestId'
 import 'server-only'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
@@ -10,7 +11,8 @@ export const dynamic = 'force-dynamic'
 
 // GET /api/profile — сводная статистика текущего пользователя
 // (пройдено узлов, создано деревьев, streak, достижения).
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const requestId = getRequestId(request)
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -68,7 +70,7 @@ export async function GET() {
       })
     )
   } catch (error) {
-    logApiError('GET /api/profile', error)
+    logApiError('GET /api/profile', error, { requestId })
     return NextResponse.json(
       createErrorResponse('Internal server error', 'INTERNAL_ERROR'),
       { status: 500 }
