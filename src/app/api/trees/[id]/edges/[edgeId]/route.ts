@@ -1,6 +1,7 @@
 import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
@@ -48,20 +49,20 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const existingEdge = await prisma.edge.findUnique({
-      where: { id: edgeId },
-    })
-
-    if (!existingEdge || existingEdge.treeId !== treeId) {
-      return NextResponse.json(
-        createErrorResponse('Edge not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
+    // Scoped-delete: ребро должно принадлежать указанному дереву текущего владельца.
+    try {
+      await prisma.edge.delete({
+        where: { id: edgeId, treeId, tree: { authorId: session.user.id } },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return NextResponse.json(
+          createErrorResponse('Edge not found', 'NOT_FOUND'),
+          { status: 404 }
+        )
+      }
+      throw error
     }
-
-    await prisma.edge.delete({
-      where: { id: edgeId },
-    })
 
     return NextResponse.json(createSuccessResponse({ message: 'Edge deleted' }))
   } catch (error) {

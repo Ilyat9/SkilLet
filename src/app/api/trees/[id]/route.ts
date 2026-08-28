@@ -1,6 +1,7 @@
 import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { TreeUpdateSchema } from '@/entities/tree/model/schemas'
@@ -79,24 +80,6 @@ export async function PATCH(
 
     const { id: treeId } = await params
 
-    const tree = await prisma.tree.findUnique({
-      where: { id: treeId },
-    })
-
-    if (!tree) {
-      return NextResponse.json(
-        createErrorResponse('Tree not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
-    }
-
-    if (tree.authorId !== session.user.id) {
-      return NextResponse.json(
-        createErrorResponse('Forbidden', 'FORBIDDEN'),
-        { status: 403 }
-      )
-    }
-
     const parsedBody = await parseJsonBody(request)
     if (parsedBody.error) return parsedBody.error
 
@@ -109,16 +92,30 @@ export async function PATCH(
       )
     }
 
+    // Проверка владельца и мутация одним scoped-запросом (authorId в WHERE):
+    // исключает TOCTOU между чтением и записью; P2025 (не найдено с учётом
+    // фильтра) маппится в тот же ответ, что и «чужое дерево» — 404.
     const { title, description, isPublic } = validation.data
 
-    const result = await prisma.tree.update({
-      where: { id: treeId },
-      data: {
-        ...(title !== undefined ? { title } : {}),
-        ...(description !== undefined ? { description } : {}),
-        ...(isPublic !== undefined ? { isPublic } : {}),
-      },
-    })
+    let result
+    try {
+      result = await prisma.tree.update({
+        where: { id: treeId, authorId: session.user.id },
+        data: {
+          ...(title !== undefined ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
+          ...(isPublic !== undefined ? { isPublic } : {}),
+        },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return NextResponse.json(
+          createErrorResponse('Tree not found', 'NOT_FOUND'),
+          { status: 404 }
+        )
+      }
+      throw error
+    }
 
     return NextResponse.json(createSuccessResponse(result))
   } catch (error) {
@@ -145,27 +142,21 @@ export async function DELETE(
 
     const { id: treeId } = await params
 
-    const tree = await prisma.tree.findUnique({
-      where: { id: treeId },
-    })
-
-    if (!tree) {
-      return NextResponse.json(
-        createErrorResponse('Tree not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
+    // Scoped-delete: authorId в WHERE исключает TOCTOU; несуществующее ИЛИ
+    // чужое дерево неотличимо дают 404 (не раскрываем существование приватных деревьев).
+    try {
+      await prisma.tree.delete({
+        where: { id: treeId, authorId: session.user.id },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return NextResponse.json(
+          createErrorResponse('Tree not found', 'NOT_FOUND'),
+          { status: 404 }
+        )
+      }
+      throw error
     }
-
-    if (tree.authorId !== session.user.id) {
-      return NextResponse.json(
-        createErrorResponse('Forbidden', 'FORBIDDEN'),
-        { status: 403 }
-      )
-    }
-
-    await prisma.tree.delete({
-      where: { id: treeId },
-    })
 
     return NextResponse.json(createSuccessResponse({ message: 'Tree deleted' }))
   } catch (error) {

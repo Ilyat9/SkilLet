@@ -1,6 +1,7 @@
 import { logApiError } from '@/shared/lib/logger'
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/shared/lib/prisma'
 import { auth } from '@/shared/lib/auth'
 import { NodeUpdateSchema } from '@/entities/node/model/schemas'
@@ -13,9 +14,14 @@ export const dynamic = 'force-dynamic'
 
 type RouteContext = { params: Promise<{ id: string; nodeId: string }> }
 
+/**
+ * Проверка владельца дерева при чтении (для ответов 404/403 до мутации).
+ * Сами мутации ниже дополнительно scoped по authorId в WHERE — см. PATCH/DELETE.
+ */
 async function requireTreeOwner(treeId: string, userId: string) {
   const tree = await prisma.tree.findUnique({
     where: { id: treeId },
+    select: { authorId: true },
   })
 
   if (!tree) {
@@ -60,17 +66,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const existingNode = await prisma.node.findUnique({
-      where: { id: nodeId },
-    })
-
-    if (!existingNode || existingNode.treeId !== treeId) {
-      return NextResponse.json(
-        createErrorResponse('Node not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
-    }
-
     const parsedBody = await parseJsonBody(request)
     if (parsedBody.error) return parsedBody.error
 
@@ -101,17 +96,30 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
           : []
     }
 
-    const node = await prisma.node.update({
-      where: { id: nodeId },
-      data: {
-        ...(title !== undefined ? { title } : {}),
-        ...(description !== undefined ? { description } : {}),
-        ...(positionX !== undefined ? { positionX } : {}),
-        ...(positionY !== undefined ? { positionY } : {}),
-        ...(difficulty !== undefined ? { difficulty } : {}),
-        ...(resources !== undefined ? { resources } : {}),
-      },
-    })
+    // Scoped-update: узел должен существовать, принадлежать этому дереву
+    // и дереву текущего владельца — всё в одном WHERE (исключает TOCTOU).
+    let node
+    try {
+      node = await prisma.node.update({
+        where: { id: nodeId, treeId, tree: { authorId: session.user.id } },
+        data: {
+          ...(title !== undefined ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
+          ...(positionX !== undefined ? { positionX } : {}),
+          ...(positionY !== undefined ? { positionY } : {}),
+          ...(difficulty !== undefined ? { difficulty } : {}),
+          ...(resources !== undefined ? { resources } : {}),
+        },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return NextResponse.json(
+          createErrorResponse('Node not found', 'NOT_FOUND'),
+          { status: 404 }
+        )
+      }
+      throw error
+    }
 
     return NextResponse.json(createSuccessResponse(node))
   } catch (error) {
@@ -155,20 +163,20 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       )
     }
 
-    const existingNode = await prisma.node.findUnique({
-      where: { id: nodeId },
-    })
-
-    if (!existingNode || existingNode.treeId !== treeId) {
-      return NextResponse.json(
-        createErrorResponse('Node not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
+    // Scoped-delete (id + treeId + владелец дерева в одном WHERE).
+    try {
+      await prisma.node.delete({
+        where: { id: nodeId, treeId, tree: { authorId: session.user.id } },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return NextResponse.json(
+          createErrorResponse('Node not found', 'NOT_FOUND'),
+          { status: 404 }
+        )
+      }
+      throw error
     }
-
-    await prisma.node.delete({
-      where: { id: nodeId },
-    })
 
     return NextResponse.json(createSuccessResponse({ message: 'Node deleted' }))
   } catch (error) {
