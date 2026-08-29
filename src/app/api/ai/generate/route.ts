@@ -23,8 +23,16 @@ import { TreeCategorySchema } from '@/entities/tree/model/schemas'
  * Chat Completions API без дополнительного SDK. Конфигурация через .env:
  *   - OPENAI_API_KEY  — обязателен; без него эндпоинт честно отвечает
  *     503 AI_NOT_CONFIGURED (предсказуемая деградация вместо падения);
- *   - OPENAI_BASE_URL — опционально (совместимые провайдеры);
- *   - OPENAI_MODEL    — опционально, по умолчанию gpt-4o-mini.
+ *   - OPENAI_BASE_URL — опционально (совместимые провайдеры, напр. OpenRouter);
+ *   - OPENAI_MODEL    — опционально, по умолчанию gpt-4o-mini;
+ *   - OPENAI_FALLBACK_MODELS — опционально, список резервных моделей через
+ *     запятую. Если не задан, используется встроенный список бесплатных
+ *     моделей OpenRouter (актуализирован 2026-08, все поддерживают
+ *     response_format: json_object) — см. DEFAULT_FALLBACK_MODELS ниже.
+ *
+ * Фолбэк-механика: если основная модель недоступна (провайдер убрал модель,
+ * 4xx/5xx, таймаут) — сервер автоматически пробует следующую модель из цепочки,
+ * поэтому генерация не ломается из-за исчезновения одной модели у провайдера.
  */
 
 export const runtime = 'nodejs'
@@ -35,6 +43,11 @@ export const dynamic = 'force-dynamic'
 const LLM_TIMEOUT_MS = 30_000
 /** Сообщение при таймауте LLM: пользовательский ответ маппится в 504. */
 const LLM_TIMEOUT_DESCRIPTION = 'AI-сервис не ответил за 30 секунд'
+/**
+ * Общий дедлайн всей цепочки моделей (включая фолбэки): ограничивает худший
+ * случай, чтобы Serverless Function не упёрлась в лимит времени платформы.
+ */
+const TOTAL_DEADLINE_MS = 55_000
 
 /** Максимум попыток получить валидный JSON от модели. */
 const MAX_ATTEMPTS = 2
@@ -71,6 +84,30 @@ interface ChatCompletionResponse {
 
 const OPENAI_API_URL = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1'
 const OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
+
+/**
+ * Встроенные резервные модели (бесплатный тир OpenRouter, проверены 2026-08:
+ * все заявляют поддержку response_format/structured_outputs). Порядок —
+ * от крупной к меньшей: сначала мощные модели, слабые — в конце.
+ * Список обновляется вручную по мере ротации бесплатного тира:
+ *   curl -s https://openrouter.ai/api/v1/models | фильтр по ':free'
+ */
+const DEFAULT_FALLBACK_MODELS = [
+  'z-ai/glm-5.2:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'minimax/minimax-m3:free',
+  'google/gemma-4-31b-it:free',
+]
+
+/** Цепочка моделей: основная → заданные в env → встроенные бесплатные. Дубликаты убираются. */
+const MODEL_CHAIN: readonly string[] = Array.from(
+  new Set([
+    OPENAI_MODEL,
+    ...(process.env.OPENAI_FALLBACK_MODELS !== undefined
+      ? process.env.OPENAI_FALLBACK_MODELS.split(',').map((m) => m.trim()).filter(Boolean)
+      : DEFAULT_FALLBACK_MODELS),
+  ])
+)
 
 function clampCoordinate(value: number): number {
   return Math.max(-NODE_POSITION_LIMIT, Math.min(NODE_POSITION_LIMIT, Math.round(value)))
@@ -127,7 +164,7 @@ function extractJson(raw: string): unknown {
   return JSON.parse(jsonText.trim()) as unknown
 }
 
-async function callLlm(topic: string, stricterInstruction?: string): Promise<string> {
+async function callLlm(topic: string, model: string, stricterInstruction?: string): Promise<string> {
   const systemPrompt =
     'Ты методист обучающих skill-tree. Возвращай СТРОГО валидный JSON без markdown-обёрток, комментариев и пояснений. Только JSON.'
 
@@ -166,7 +203,7 @@ async function callLlm(topic: string, stricterInstruction?: string): Promise<str
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -191,31 +228,48 @@ async function callLlm(topic: string, stricterInstruction?: string): Promise<str
 }
 
 /**
- * Пытается получить валидное дерево от модели — не более MAX_ATTEMPTS попыток,
- * повторная выполняется с более строгим промтом и описанием ошибки первой.
- * Таймаут внешнего вызова не ретраится — пользователь получает быстрый 504.
+ * Пытается получить валидное дерево, перебирая MODEL_CHAIN: для каждой модели —
+ * до MAX_ATTEMPTS попыток (повторная — с более строгим промтом и описанием
+ * ошибки предыдущей). Модель, которая упала (4xx/5xx, таймаут, стабильно
+ * невалидный JSON), пропускается — запрос уходит следующей. Так генерация
+ * переживает исчезновение модели у провайдера без правок кода.
  */
 async function generateValidatedTree(
   topic: string
-): Promise<{ tree: AiTreeResponse } | { error: string; timedOut?: boolean }> {
+): Promise<{ tree: AiTreeResponse; model: string } | { error: string; timedOut?: boolean }> {
   let lastErrorDescription = ''
+  const startedAt = Date.now()
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const rawContent = await callLlm(topic, attempt > 1 ? lastErrorDescription : undefined)
+  for (const model of MODEL_CHAIN) {
+    let moveToNextModel = false
 
-      const parsed = AiTreeSchema.safeParse(extractJson(rawContent))
-      if (parsed.success) {
-        return { tree: normalizeAiTree(parsed.data) }
+    // Общий дедлайн цепочки: если время почти вышло — не начинаем новую модель.
+    if (Date.now() - startedAt > TOTAL_DEADLINE_MS) break
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !moveToNextModel; attempt += 1) {
+      try {
+        const rawContent = await callLlm(topic, model, attempt > 1 ? lastErrorDescription : undefined)
+
+        const parsed = AiTreeSchema.safeParse(extractJson(rawContent))
+        if (parsed.success) {
+          return { tree: normalizeAiTree(parsed.data), model }
+        }
+
+        lastErrorDescription = parsed.error.errors[0]?.message ?? 'ответ не соответствует схеме'
+      } catch (error) {
+        // AbortSignal.timeout отклоняет fetch с DOMException TimeoutError.
+        if (error instanceof Error && error.name === 'TimeoutError') {
+          lastErrorDescription = `${LLM_TIMEOUT_DESCRIPTION} (${model})`
+          // Таймаут конкретной модели не ретраим — сразу пробуем следующую.
+          moveToNextModel = true
+          break
+        }
+        lastErrorDescription = error instanceof Error ? error.message : 'неизвестная ошибка запроса к модели'
+        // Ошибка провайдера (модель удалена, 404/410/5xx) — ретраить ту же
+        // модель бессмысленно, переходим к следующей.
+        moveToNextModel = true
+        break
       }
-
-      lastErrorDescription = parsed.error.errors[0]?.message ?? 'ответ не соответствует схеме'
-    } catch (error) {
-      // AbortSignal.timeout отклоняет fetch с DOMException TimeoutError.
-      if (error instanceof Error && error.name === 'TimeoutError') {
-        return { error: LLM_TIMEOUT_DESCRIPTION, timedOut: true }
-      }
-      lastErrorDescription = error instanceof Error ? error.message : 'неизвестная ошибка запроса к модели'
     }
   }
 
@@ -346,6 +400,7 @@ export async function POST(request: NextRequest) {
       treeId,
       nodesCount: aiTree.nodes.length,
       topicLength: topic.length,
+      model: generation.model,
       requestId,
     })
 
