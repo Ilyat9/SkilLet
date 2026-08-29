@@ -47,6 +47,38 @@ export const NODE_STATUS_ORDER: readonly NodeStatus[] = [
 /** Максимальное число узлов в одном дереве (защита от аномальных нагрузок на БД/UI). */
 export const MAX_NODES_PER_TREE = 100
 
+/** Максимальное число связей в одном дереве (лимит импорта/шаблона). */
+export const MAX_EDGES_PER_TREE = 400
+
 /** Границы координат узлов — должны совпадать с ограничениями NodeSchema (zod). */
 export const NODE_POSITION_LIMIT = 1000
+
+/**
+ * Категории деревьев (Prisma enum TreeCategory). ЕДИНСТВЕННЫЙ источник списка:
+ * zod-схемы, фильтр каталога и UI выбора категории берут значения отсюда.
+ * Расширение списка — правка enum в prisma/schema.prisma + миграция
+ * (ALTER TYPE ADD VALUE), затем эта константа.
+ */
+export const TREE_CATEGORIES = [
+  'FRONTEND',
+  'BACKEND',
+  'DEVOPS',
+  'DATA_SCIENCE',
+  'SOFT_SKILLS',
+  'DESIGN',
+  'OTHER',
+] as const
+
+export type TreeCategoryValue = (typeof TREE_CATEGORIES)[number]
+
+/** Человекочитаемые подписи категорий для UI (бейджи, фильтры каталога). */
+export const TREE_CATEGORY_LABELS: Record<TreeCategoryValue, string> = {
+  FRONTEND: 'Frontend',
+  BACKEND: 'Backend',
+  DEVOPS: 'DevOps',
+  DATA_SCIENCE: 'Data Science',
+  SOFT_SKILLS: 'Soft Skills',
+  DESIGN: 'Design',
+  OTHER: 'Другое',
+}
 

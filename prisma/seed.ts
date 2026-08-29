@@ -21,6 +21,7 @@ type TreeSeed = {
   title: string
   description: string
   isPublic: boolean
+  category: 'FRONTEND' | 'BACKEND' | 'DEVOPS' | 'DATA_SCIENCE' | 'SOFT_SKILLS' | 'DESIGN' | 'OTHER'
   nodes: NodeData[]
   /** Пары индексов [sourceIndex, targetIndex] по массиву nodes. */
   connections: EdgePair[]
@@ -54,6 +55,7 @@ const frontendTree: TreeSeed = {
   title: 'Frontend Разработчик',
   description: 'Полный путь от основ до продакшена',
   isPublic: true,
+  category: 'FRONTEND',
   nodes: [
     { title: 'Начало', description: 'Добро пожаловать в ваш первый навык', positionX: 0, positionY: -150, difficulty: 1 },
     { title: 'HTML & CSS Базовый', positionX: 0, positionY: -50, difficulty: 1, resourceType: 'article', resourceUrl: 'https://developer.mozilla.org/ru/docs/Web/HTML', resourceTitle: 'MDN: HTML' },
@@ -88,6 +90,7 @@ const softSkillsTree: TreeSeed = {
   title: 'Soft Skills',
   description: 'Навыки для эффективной работы в команде',
   isPublic: true,
+  category: 'SOFT_SKILLS',
   nodes: [
     { title: 'Знакомство', positionX: 0, positionY: -150, difficulty: 1 },
     { title: 'Командная работа', positionX: 0, positionY: -50, difficulty: 1 },
@@ -160,6 +163,7 @@ async function main() {
           title: treeSeed.title,
           description: treeSeed.description,
           isPublic: treeSeed.isPublic,
+          category: treeSeed.category,
           authorId: author.id,
           nodes: { create: nodesData },
         },

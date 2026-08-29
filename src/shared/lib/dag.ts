@@ -51,3 +51,35 @@ export function validateEdge(
 
   return { valid: true }
 }
+
+/**
+ * Фильтрует связи, заданные ПАРАМИ ИНДЕКСОВ массива узлов (формат шаблонов,
+ * экспорта и seed): отбрасывает выходы за границы массива, самопетли,
+ * дубликаты и связи, создающие цикл. Чистая функция — используется в
+ * from-template, импорте и unit-тестах, чтобы инвариант DAG не дублировался.
+ */
+export function sanitizeIndexConnections(
+  nodesCount: number,
+  connections: ReadonlyArray<readonly [number, number]>
+): Array<{ sourceIndex: number; targetIndex: number }> {
+  const accepted: Array<{ sourceIndex: number; targetIndex: number }> = []
+
+  for (const [sourceIndex, targetIndex] of connections) {
+    if (sourceIndex === targetIndex) continue
+    if (sourceIndex < 0 || sourceIndex >= nodesCount) continue
+    if (targetIndex < 0 || targetIndex >= nodesCount) continue
+    if (accepted.some((e) => e.sourceIndex === sourceIndex && e.targetIndex === targetIndex)) continue
+
+    // hasCycle работает по строковым id — переиспользуем её на индексах-строках.
+    const currentAsDag = accepted.map((e) => ({
+      sourceId: String(e.sourceIndex),
+      targetId: String(e.targetIndex),
+      treeId: 'index-space',
+    }))
+    if (hasCycle(currentAsDag, String(sourceIndex), String(targetIndex))) continue
+
+    accepted.push({ sourceIndex, targetIndex })
+  }
+
+  return accepted
+}

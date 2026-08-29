@@ -1,3 +1,5 @@
+import type { TreeCategoryValue } from '@/shared/constants'
+
 export interface TemplateNodeData {
   title: string
   description?: string
@@ -13,6 +15,8 @@ export interface SkillTemplate {
   id: string
   title: string
   description: string
+  /** Категория, с которой создаётся дерево из шаблона. */
+  category: TreeCategoryValue
   nodes: TemplateNodeData[]
   /** Пары индексов [sourceIndex, targetIndex] по массиву nodes. */
   connections: Array<readonly [number, number]>
@@ -70,6 +74,7 @@ export const TEMPLATES: SkillTemplate[] = [
     id: 'frontend',
     title: 'Frontend Разработчик',
     description: 'HTML, CSS, JavaScript, React, Next.js, TypeScript',
+    category: 'FRONTEND',
     nodes: frontendNodes,
     connections: frontendConnections,
   },
@@ -77,6 +82,7 @@ export const TEMPLATES: SkillTemplate[] = [
     id: 'backend',
     title: 'Backend Разработчик',
     description: 'Node.js, PostgreSQL, REST API',
+    category: 'BACKEND',
     nodes: backendNodes,
     connections: backendConnections,
   },
@@ -84,6 +90,7 @@ export const TEMPLATES: SkillTemplate[] = [
     id: 'data-science',
     title: 'Data Scientist',
     description: 'Python, NumPy, Pandas, Scikit-learn',
+    category: 'DATA_SCIENCE',
     nodes: dataScienceNodes,
     connections: dataScienceConnections,
   },

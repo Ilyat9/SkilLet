@@ -3,63 +3,130 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id               String    @id @default(cuid())
-  name             String?
-  email            String?   @unique
-  image            String?
-  githubId         String?   @unique
-  createdAt        DateTime  @default(now())
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?  @unique
+  image     String?
+  githubId  String?  @unique
+  createdAt DateTime @default(now())
 
   // Streak (серия дней активности)
   lastActivityDate DateTime?
   currentStreak    Int       @default(0)
   longestStreak    Int       @default(0)
 
-  trees         Tree[]
-  progresses    UserProgress[]
-  accounts      Account[]
-  sessions      Session[]
-  achievements  UserAchievement[]
+  trees        Tree[]
+  progresses   UserProgress[]
+  accounts     Account[]
+  sessions     Session[]
+  achievements UserAchievement[]
+  treeLikes    TreeLike[]
+  comments     Comment[]
 }
 
 model Tree {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
   description String?
-  isPublic    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  category    TreeCategory @default(OTHER)
+  isPublic    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
-  nodes       Node[]
-  edges       Edge[]
-  progresses  UserProgress[]
+  // Форк: nullable self-relation. Выбран явный forkedFromId на Tree (а не
+  // отдельная join-таблица), потому что связь всегда 1:1 («дерево форкнуто
+  // ровно из одного оригинала»), она читается вместе с деревом на странице
+  // (атрибуция «форк дерева X от @автор») и onDelete: SetNull сохраняет форк
+  // как самостоятельное дерево после удаления оригинала.
+  forkedFromId String?
+  forkedFrom   Tree?   @relation("TreeForks", fields: [forkedFromId], references: [id], onDelete: SetNull)
+  forks        Tree[]  @relation("TreeForks")
+
+  nodes      Node[]
+  edges      Edge[]
+  progresses UserProgress[]
+  likes      TreeLike[]
+  comments   Comment[]
 
   @@index([authorId])
   // GET /api/trees?scope=public: WHERE isPublic = true ORDER BY createdAt DESC
   // (публичный каталог /explore с сортировкой «по дате»). Составной индекс
   // покрывает и фильтр по isPublic, поэтому одиночный @@index([isPublic]) удалён.
   @@index([isPublic, createdAt(sort: Desc)])
+  // Фильтр каталога по категории (scope=public AND category): префикс isPublic
+  // совпадает с основным листингом — индекс покрывает оба запроса.
+  @@index([isPublic, category, createdAt(sort: Desc)])
+  // GET /api/trees/[id]/forks — список публичных форков конкретного дерева.
+  @@index([forkedFromId])
+}
+
+/// Категории деревьев для умной фильтрации каталога (/explore).
+/// Расширение списка — миграция (enum без даунтайма: ALTER TYPE ADD VALUE).
+enum TreeCategory {
+  FRONTEND
+  BACKEND
+  DEVOPS
+  DATA_SCIENCE
+  SOFT_SKILLS
+  DESIGN
+  OTHER
+}
+
+model TreeLike {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  treeId String
+  tree   Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  // Один лайк на пару (пользователь, дерево): повторный POST снимает лайк.
+  @@unique([userId, treeId])
+  // Счётчик лайков дерева (сортировка каталога «по популярности») и
+  // агрегат _count.likes при листинге — фильтр по treeId.
+  @@index([treeId])
+}
+
+// Плоский список комментариев (без вложенных тредов): для масштаба продукта
+// треды не нужны, а отсутствие parentId упрощает модерацию и пагинацию.
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  treeId String
+  tree   Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  // Лист комментариев дерева: WHERE treeId ORDER BY createdAt DESC + пагинация.
+  @@index([treeId, createdAt(sort: Desc)])
+  // Профиль/модерация: все комментарии пользователя.
+  @@index([authorId])
 }
 
 model Node {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   title       String
   description String?
-  resources   Json     // [{ type: "video"|"article", url: string, title: string }]
-  positionX   Float    @default(0)
-  positionY   Float    @default(0)
-  difficulty  Int      @default(1)    // 1-10
+  resources   Json // [{ type: "video"|"article", url: string, title: string }]
+  positionX   Float   @default(0)
+  positionY   Float   @default(0)
+  difficulty  Int     @default(1) // 1-10
 
-  treeId      String
-  tree        Tree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  treeId String
+  tree   Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
 
   outgoingEdges Edge[]         @relation("EdgeSource")
   incomingEdges Edge[]         @relation("EdgeTarget")
@@ -69,9 +136,9 @@ model Node {
 }
 
 model Edge {
-  id       String @id @default(cuid())
-  treeId   String
-  tree     Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  treeId String
+  tree   Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
 
   sourceId String
   source   Node   @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
@@ -84,18 +151,18 @@ model Edge {
 }
 
 model UserProgress {
-  id          String   @id @default(cuid())
-  completed   Boolean  @default(false)
+  id          String    @id @default(cuid())
+  completed   Boolean   @default(false)
   completedAt DateTime?
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  treeId      String
-  tree        Tree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  treeId String
+  tree   Tree   @relation(fields: [treeId], references: [id], onDelete: Cascade)
 
-  nodeId      String
-  node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  nodeId String
+  node   Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, nodeId])
   // Подсчёт статистики профиля и streak (GET /api/profile, сервис достижений):
@@ -144,8 +211,8 @@ model VerificationToken {
 // Каталог достижений: содержимое задаётся сидированием (prisma/seed.ts),
 // код начисления — кодом достижения (code) в бизнес-логике.
 model Achievement {
-  id          String   @id @default(cuid())
-  code        String   @unique
+  id          String @id @default(cuid())
+  code        String @unique
   title       String
   description String
   icon        String
@@ -156,14 +223,14 @@ model Achievement {
 }
 
 model UserAchievement {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   achievementId String
   achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
 
-  unlockedAt    DateTime @default(now())
+  unlockedAt DateTime @default(now())
 
   @@unique([userId, achievementId])
   @@index([userId])
