@@ -83,7 +83,6 @@ interface ChatCompletionResponse {
 }
 
 const OPENAI_API_URL = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1'
-const OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
 
 /**
  * Встроенные резервные модели (бесплатный тир OpenRouter, проверены 2026-08:
@@ -97,7 +96,19 @@ const DEFAULT_FALLBACK_MODELS = [
   'nvidia/nemotron-3-super-120b-a12b:free',
   'minimax/minimax-m3:free',
   'google/gemma-4-31b-it:free',
-]
+] as const
+/** Первая (самая мощная) бесплатная модель — дефолт для OpenRouter. */
+const OPENROUTER_DEFAULT_MODEL: string = DEFAULT_FALLBACK_MODELS[0]
+
+/**
+ * Основная модель. Пустая строка в env трактуется как «не задана» (?? не ловит
+ * '', поэтому — через trim+||). Для OpenRouter дефолт — бесплатная модель:
+ * платные (без суффикса :free) на дефолте не используются, чтобы пустое поле
+ * OPENAI_MODEL в env не приводило к списаниям кредитов.
+ */
+const USING_OPENROUTER = OPENAI_API_URL.includes('openrouter')
+const OPENAI_MODEL =
+  process.env.OPENAI_MODEL?.trim() || (USING_OPENROUTER ? OPENROUTER_DEFAULT_MODEL : 'gpt-4o-mini')
 
 /** Цепочка моделей: основная → заданные в env → встроенные бесплатные. Дубликаты убираются. */
 const MODEL_CHAIN: readonly string[] = Array.from(
