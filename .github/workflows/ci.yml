@@ -26,6 +26,9 @@ jobs:
           --health-retries 5
     env:
       SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/skillet_ci
+      # DATABASE_URL обязателен для prisma validate/generate/build (в CI нет .env);
+      # реальных подключений нет: migrate diff работает только через shadow-БД.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/skillet_ci
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +82,9 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/skillet_test
       AUTH_SECRET: ci-test-secret
+      # Для prisma generate (env-переменная схемы); подключения идут только
+      # к TEST_DATABASE_URL через globalSetup тестов.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/skillet_test
     steps:
       - uses: actions/checkout@v4
 
