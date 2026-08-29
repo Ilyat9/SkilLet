@@ -12,6 +12,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "demo:gif": "node --env-file=.env scripts/capture/capture-demo.mjs",
     "test": "vitest run"
   },
   "prisma": {
