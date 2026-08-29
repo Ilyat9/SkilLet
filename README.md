@@ -1,375 +1,214 @@
-# SkilLet — Skill Tree Learning Platform
+# SkilLet
 
-**Преобразуйте изучение навыков в увлекательную игру с визуальными skill-деревьями**
+<p align="left">
+  <a href="https://github.com/Ilyat9/SkilLet/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Ilyat9/SkilLet/ci.yml?branch=main&label=CI" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <img src="https://img.shields.io/badge/Next.js-15-black" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/React-19-blue" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5-blue" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/Prisma-6-2D3748" alt="Prisma 6" />
+  <img src="https://img.shields.io/badge/node-%E2%89%A520-brightgreen" alt="Node >= 20" />
+</p>
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![React](https://img.shields.io/badge/React-19-blue)
+Интерактивная платформа для обучения в формате RPG skill-tree: предметная область разбивается на узлы-навыки с зависимостями (DAG), прогресс отмечается вручную, пререквизиты разблокируются последовательно.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/Ilyat9/SkilLet?style=social)](https://github.com/Ilyat9/SkilLet)
-[![GitHub followers](https://img.shields.io/github/followers/Ilyat9?style=social)](https://github.com/Ilyat9)
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Демонстрация SkilLet: каталог, дерево навыков, создание дерева" width="1000" />
+</p>
 
----
+| Лендинг | Каталог сообщества |
+|---|---|
+| ![Лендинг](docs/assets/landing.png) | ![Каталог](docs/assets/explore.png) |
 
-## 🌟 Что такое SkilLet
+| Дерево навыков | Создание дерева |
+|---|---|
+| ![Дерево навыков](docs/assets/tree-view.png) | ![Создание дерева](docs/assets/tree-new.png) |
 
-**SkilLet** — это интерактивная платформа для обучения навыков в формате RPG skill-tree. Превращайте скучное изучение новых технологий в увлекательную игру с визуальными деревьями прогресса, достижениями и системой наград.
+## Возможности
 
-### Ключевые возможности:
+- Skill-деревья на ReactFlow с блокировкой узлов по пререквизитам (DAG без циклов), drag & drop-редактор, панель узла (описание, сложность 1–10, ресурсы видео/статья)
+- Три способа создания дерева: вручную, из шаблона (Frontend / Backend / Data Science — импорт одной транзакцией), AI-генерация по теме через OpenAI-совместимый API (без ключа фича предсказуемо недоступна)
+- Экспорт дерева в JSON и импорт из файла с zod-валидацией и лимитами размера
+- Сообщество: лайки (оптимистичный UI с откатом), комментарии с модерацией автором дерева, форки публичных деревьев с атрибуцией оригинала
+- Каталог публичных деревьев с поиском, сортировкой по популярности/дате, фильтрами по категории и средней сложности узлов, пагинацией
+- Геймификация: достижения («Первые шаги», «Дерево пройдено», «Марафонец», «Создатель», «Архитектор связей») проверяются на бэкенде при отметке прогресса; серия дней изучения (streak) с логом
+- Авторизация через GitHub OAuth (NextAuth v5, JWT-сессии), полный CRUD деревьев/узлов/рёбер через REST API с zod-валидацией и scoped-проверками владельца
+- Эксплуатационная база: rate limiting мутирующих роутов, health-check `/api/health`, JSON-логи с `X-Request-Id`, error tracking (Sentry-совместимый DSN), security-заголовки с построчным обоснованием CSP, graceful shutdown
 
-- 🎮 **Геймифицированное обучение** — изучайте навыки как RPG-персонажа
-- 🌳 **Визуальные деревья** — интерактивные skill-деревья с ReactFlow
-- 📊 **Прогресс-бары** — отслеживайте свой прогресс в реальном времени
-- 🏆 **Система достижений** — награды за пройденные навыки
-- 🔗 **Связи навыков** — понятная визуализация зависимостей
-- 👥 **Публичные деревья** — вдохновляющие примеры от сообщества
-- 🎯 **Умная фильтрация** — ищите нужные навыки по категориям
+## Технологии
 
-**Готово к использованию? Начните прямо сейчас!**
+| Слой | Технология |
+|---|---|
+| Framework | [Next.js 15](https://nextjs.org) (App Router) · React 19 |
+| Язык | TypeScript 5 (strict, zero-any) |
+| БД | PostgreSQL 16 · Prisma ORM 6 |
+| Аутентификация | NextAuth v5 (Auth.js) + GitHub OAuth + PrismaAdapter |
+| Граф | @xyflow/react (ReactFlow) |
+| Стилизация | Tailwind CSS 4 · lucide-react |
+| Валидация | zod |
+| Тесты | vitest (unit + интеграционные на реальном Postgres) |
+| CI | GitHub Actions: lint, типы, сборка, дрейф миграций, тесты |
 
----
+## Архитектура
 
-## 🚀 Начать пользоваться
+Feature-Sliced Design: зависимости направлены строго вниз, `app → widgets → features → entities → shared`. Инфраструктурные точки расширения (rate limiter, error tracking, логгер) изолированы в `shared/lib` — реализацию можно заменить, не трогая вызывающий код.
 
-### Шаг 1: Регистрация через GitHub
+```mermaid
+flowchart TB
+    subgraph CLIENT[Клиент — React 19 + Tailwind 4]
+        PAGES["Страницы: / · /explore · /dashboard · /profile · /tree/[id]<br/>ReactFlow-просмотр и редактор · оптимистичные обновления"]
+        AUTHUI["AuthButton · useSession"]
+    end
 
-1. Запустите приложение локально (см. «Быстрый старт» ниже)
-2. Нажмите **"Sign in with GitHub"**
-3. Готово! Вы попадёте в дашборд с вашими деревьями
+    subgraph SERVER[Сервер — Next.js App Router]
+        MW["middleware.ts — X-Request-Id"]
+        ROUTES["REST API (route handlers)<br/>zod-валидация · rate limiting · scoped-проверки владельца"]
+        LOGIC["Бизнес-логика<br/>DAG-инвариант в Serializable-транзакции<br/>достижения · streak"]
+    end
 
-### Шаг 2: Создайте или выберите дерево
+    subgraph SHARED[shared/lib — точки расширения]
+        RL["rateLimit — интерфейс + in-memory адаптер"]
+        LOG["logger — JSON-логи · errorTracking — Sentry DSN"]
+    end
 
-На странице **«Создать дерево»** доступны три способа:
+    AUTHLIB["NextAuth v5 — GitHub OAuth<br/>JWT-сессии · PrismaAdapter"]
+    DB[("PostgreSQL 16<br/>Prisma · миграции · индексы под запросы")]
 
-- **Пустое дерево** — начните с чистого холста
-- **Шаблоны** — Frontend / Backend / Data Science, импортируются одной транзакцией и становятся вашими
-- **AI-генерация** — опишите тему, LLM построит готовое дерево из 8–20 узлов со связями и ресурсами
+    PAGES -->|fetch /api/*| MW
+    MW --> ROUTES
+    AUTHUI --- AUTHLIB
+    ROUTES --> LOGIC
+    ROUTES -.-> RL
+    ROUTES -.-> LOG
+    LOGIC --> DB
+    AUTHLIB --> DB
 
-Либо откройте **Каталог** публичных деревьев сообщества.
+    style DB fill:#2563eb,stroke:#3b82f6,color:#ffffff
+```
 
-### Шаг 3: Изучайте и отмечайте прогресс
+Ключевые решения:
 
-1. Откройте дерево и выберите доступный узел
-2. Изучите материал по ресурсу (видео/статья)
-3. Отметьте узел пройденным — пререквизиты разблокируются
-4. Получайте достижения 🏆 и поддерживайте streak 🔥
+- **DAG-инвариант**: создание ребра — `validateEdge` + вставка в одной Serializable-транзакции; гонка двух параллельных рёбер не может создать цикл. Дубликаты рёбер исключены на уровне БД (`Edge @@unique([sourceId, targetId])`)
+- **JWT-сессии** вместо database-стратегии: без обращения к БД на каждый запрос, `session.user.id` заполняется колбэком
+- **Индексы под реальные запросы**: каталог (`isPublic, createdAt DESC`), streak/статистика (`UserProgress(userId, completed)`), прогресс по дереву (`userId, treeId`)
+- **Наблюдаемость**: каждый запрос получает `X-Request-Id`, бизнес-события логируются структурно (`tree_created`, `progress_marked`, `achievement_unlocked`), необработанные ошибки API уходят в Sentry при заданном `SENTRY_DSN`
 
-### Шаг 4: Отслеживайте статистику
+Подробности — в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): ER-модель, аудит авторизации, восемь осознанных архитектурных компромиссов с триггерами к переделке.
 
-На странице **Профиль**: суммарно пройдено узлов, создано деревьев,
-серия дней изучения (текущая и рекордная) и все достижения.
+## Быстрый старт
 
----
+Требования: Node.js ≥ 20, npm ≥ 10, PostgreSQL (локально или managed).
 
-## ✨ Функциональность MVP
-
-Реализовано и работает:
-
-- ✅ Авторизация через GitHub OAuth (NextAuth v5)
-- ✅ Skill-деревья на ReactFlow с блокировкой узлов по пререквизитам (DAG без циклов)
-- ✅ Полный CRUD деревьев, узлов и связей через REST API с zod-валидацией и проверкой прав
-- ✅ Drag & Drop редактор: перетаскивание узлов с сохранением координат,
-  панель узла (название, описание, сложность 1–10, ресурс видео/статья)
-- ✅ Три способа создания дерева: вручную, из шаблона, AI-генерация по теме
-  (OpenAI-совместимый API, ключ `OPENAI_API_KEY` в `.env`; без ключа фича
-  предсказуемо недоступна)
-- ✅ Экспорт дерева в JSON и импорт из файла с zod-валидацией и лимитами
-- ✅ Сообщество: лайки, комментарии (модерация автором дерева) и форки публичных
-  деревьев с атрибуцией оригинала
-- ✅ Категории деревьев + фильтрация каталога по категории и средней сложности узлов
-- ✅ Достижения: «Первые шаги», «Дерево пройдено», «Марафонец», «Создатель»,
-  «Архитектор связей» — проверяются на бэкенде при отметке прогресса
-- ✅ Streak — серия дней изучения с логикой вчера/сегодня/сброс
-- ✅ Публичный каталог `/explore` с поиском и сортировкой по популярности/дате
-- ✅ Профиль пользователя со сводной статистикой
-- ✅ Кнопка «Поделиться» (copy-to-clipboard) на публичных деревьях
-- ✅ Оптимистичные обновления с откатом при ошибке сервера
-- ✅ Адаптивная вёрстка: сайдбар прогресса превращается в bottom-sheet drawer на мобильных
-- ✅ SEO-метаданные и Open Graph для страниц деревьев
-- ✅ Юнит-тесты чистой бизнес-логики (`npm test`, vitest)
-
-> 📸 **TODO: скриншот/GIF демо** — запланировано добавить автоматизированный
-> screenshot через Playwright headless; сейчас актуальный вид проще всего
-> оценить, запустив проект локально.
-
----
-
-## 💻 Технологии
-
-### Frontend Stack
-- **Next.js 15** — современный React-фреймворк с App Router
-- **React 19** — последние возможности React
-- **TypeScript 5** — строгая типизация
-- **Tailwind CSS 4** — utility-first CSS framework
-- **ReactFlow** (@xyflow/react) — визуализация графов и деревьев
-
-### Backend & Database
-- **PostgreSQL** — реляционная база данных
-- **Prisma ORM** — type-safe database client
-- **NextAuth.js v5** — аутентификация через GitHub OAuth
-- **Zod** — валидация данных
-
-### Architecture
-- **Feature-Sliced Design** — модульная архитектура
-- **Server/Client boundaries** — правильная изоляция
-- **Zero-Any Policy** — типобезопасный код
-- **API-first approach** — REST API для фронтенда
-
-### DevOps
-- **Docker** — контейнеризация (app + PostgreSQL + one-off миграции)
-- **GitHub Actions** — CI/CD: на каждый PR и push в main поднимается Postgres и
-  прогоняются `npm ci`, `prisma validate` + проверка дрейфа миграций
-  (`migrate diff`), `tsc --noEmit`, `eslint src`, `npm run build` и
-  интеграционные тесты (`vitest run` на реальном Postgres)
-
----
-
-## 🛠️ Деплой для разработчиков
-
-### Предварительные требования
-
-- Node.js 20+
-- npm 10+
-- PostgreSQL или Docker
-- GitHub аккаунт для OAuth
-
-### Быстрый старт (5 команд)
+1. GitHub OAuth App: Settings → Developer settings → OAuth Apps → New. Homepage — `http://localhost:3000`, callback — `http://localhost:3000/api/auth/callback/github`
+2. Склонировать и настроить окружение:
 
 ```bash
-git clone https://github.com/Ilyat9/SkilLet.git && cd SkilLet
-cp .env.example .env            # заполните AUTH_*, GITHUB_* ключи
-docker-compose up -d postgres   # поднять PostgreSQL
-npx prisma migrate dev && npx prisma db seed
-npm run dev                     # http://localhost:3000
+git clone https://github.com/Ilyat9/SkilLet.git
+cd SkilLet
+npm ci
+cp .env.example .env   # заполните AUTH_SECRET, AUTH_GITHUB_ID, AUTH_GITHUB_SECRET, DATABASE_URL
 ```
 
-Переменные окружения в `.env`:
-
-```env
-# База данных (обязательно)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/skillet"
-
-# NextAuth (обязательно)
-AUTH_SECRET="openssl rand -base64 32"
-AUTH_GITHUB_ID="ваш_github_client_id"
-AUTH_GITHUB_SECRET="ваш_github_client_secret"
-NEXTAUTH_URL="http://localhost:3000"
-
-# AI-генерация деревьев (опционально)
-OPENAI_API_KEY=""
-OPENAI_MODEL="gpt-4o-mini"          # по умолчанию
-OPENAI_BASE_URL="https://api.openai.com/v1"  # любой совместимый провайдер
-```
-
-Либо одной командой целиком в Docker: `docker-compose up --build`.
-
-### Основные команды
+3. Миграции и сиды:
 
 ```bash
-npm run dev        # запустить dev сервер
-npm run build      # production build
-npm start          # production server
-npm run lint       # проверка кода
-npm run test       # юнит-тесты (vitest)
-npm run format     # форматирование кода
-
-# Prisma
-npx prisma studio       # GUI база данных
-npm run db:migrate      # локальные миграции (prisma migrate dev)
-npm run db:deploy       # применить миграции к прод-БД (prisma migrate deploy)
-npx prisma db seed      # seed данные
+npm run db:migrate     # prisma migrate dev
+npm run db:seed        # шаблоны достижений + демо-данные
 ```
 
----
+4. Запуск:
 
-## 🚀 Деплой в продакшен
-
-Основной сценарий: **self-hosted Docker (`output: 'standalone'`) + управляемый Postgres [Neon]**
-(автобэкапы включены тарифом). Альтернатива — Vercel.
-
-Краткий чеклист переменных окружения для прода:
-
-```env
-DATABASE_URL="postgresql://…@ep-xxx.neon.tech/skillet?sslmode=require"
-AUTH_SECRET="<openssl rand -base64 32>"
-NEXTAUTH_URL="https://<ваш-домен>"
-AUTH_GITHUB_ID="<отдельное OAuth App для прода>"
-AUTH_GITHUB_SECRET="<…>"
+```bash
+npm run dev            # http://localhost:3000
 ```
 
-Полная инструкция (Docker/Vercel, callback URL GitHub, бэкапы `pg_dump`, мониторинг
-`/api/health` через UptimeRobot) — в **[DEPLOYMENT.md](./docs/DEPLOYMENT.md)**.
+Без GitHub OAuth-ключей вход работать не будет; остальные публичные страницы — будут.
 
----
+### Docker
 
-## ♿ Доступность
+```bash
+docker-compose up --build -d   # postgres + one-off миграции + приложение
+```
 
-Что поддерживается во фронтенде:
+Прод-деплой (Docker + Neon, Vercel), rollback, ротация секретов, бэкапы, мониторинг — в [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-- **Полноценная навигация с клавиатуры**: узлы дерева и карточки деревьев активируются
-  Enter/Space; во всех интерактивных элементах видимый focus-ring.
-- **Модальные окна** (`role="dialog"`, `aria-modal`): focus trap (Tab не выходит за пределы),
-  закрытие по Escape, автофокус внутрь и возврат фокуса на открывший элемент.
-- **Прогресс-бары** — `role="progressbar"` с `aria-valuenow/min/max`.
-- **aria-label на всех кнопках-иконках**, статусы узлов озвучиваются скринридерами
-  («Навык «React Hooks», статус: доступен»), заблокированные узлы помечены `aria-disabled`.
-- Тосты живут в `role="status" aria-live="polite"` — сообщения объявляются автоматически.
-- **Семантические цветовые токены**, все пары текст/фон проверены калькулятором WCAG:
-  обычный текст ≥ 4.5:1 (WCAG AA). Поддерживаются светлая и тёмная темы.
-- Автоматическая проверка **axe-core** в dev-режиме (нарушения печатаются в консоль);
-  в production код не подключается.
+## Скрипты
 
----
+| Команда | Действие |
+|---|---|
+| `npm run dev` | dev-сервер Next.js |
+| `npm run build` / `npm start` | прод-сборка (standalone) и запуск |
+| `npm run lint` / `npm run format` | ESLint / Prettier |
+| `npm run test` | vitest: unit + интеграционные |
+| `npm run db:migrate` / `npm run db:deploy` | миграции: dev / прод |
+| `npm run db:seed` / `npm run db:studio` | сиды / Prisma Studio |
 
-## 📁 Структура проекта
+## Тестирование
+
+```bash
+npm run test
+```
+
+- **Unit**: DAG-валидация, zod-схемы, node helpers, геймификация
+- **Интеграционные**: REST API против реального Postgres (`TEST_DATABASE_URL`, миграции накатывает globalSetup), smoke-сценарий пользовательского пути
+- **CI**: job `quality` (prisma validate, проверка дрейфа миграций против shadow-БД, tsc, eslint, build) + job `integration` (vitest на service-контейнере postgres:16)
+
+## Переменные окружения
+
+| Переменная | Обязательна | Назначение |
+|---|---|---|
+| `DATABASE_URL` | да | строка подключения Postgres |
+| `AUTH_SECRET` | да | ключ подписи JWT-сессий (`openssl rand -base64 32`) |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | да | OAuth App GitHub |
+| `NEXTAUTH_URL` | да | базовый URL приложения |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_BASE_URL` | нет | AI-генерация деревьев; без ключа — 503 с подсказкой |
+| `SENTRY_DSN` | нет | трекинг необработанных ошибок API |
+
+Полный список с пояснениями — в [.env.example](.env.example).
+
+## Структура проекта
 
 ```
 src/
-├── app/              # Next.js App Router
-│   ├── api/         # API endpoints
-│   ├── auth/        # auth routes
-│   ├── dashboard/   # личный кабинет пользователя
-│   ├── tree/        # страницы деревьев
-│   └── layout.tsx   # корневой layout
-├── entities/        # бизнес-сущности
-│   ├── tree/        # модели дерева
-│   ├── node/        # модели узлов
-│   └── edge/        # модели связей
-├── features/        # фичи (функциональность)
-│   ├── auth/        # аутентификация
-│   ├── progress/    # трекинг прогресса
-│   └── tree-builder/# конструктор деревьев
-├── widgets/         # повторяемые компоненты
-│   ├── SkillTreeViewer/
-│   ├── ProgressSidebar/
-│   └── Header/
-├── shared/          # переиспользуемые части
-│   ├── lib/         # утилиты и конфигурация
-│   ├── ui/          # базовые компоненты
-│   └── constants/   # константы
-└── types/           # расширения TypeScript
+├── app/                  # маршруты и точки входа
+│   ├── api/              #   REST API-роуты (route handlers)
+│   └── dashboard | explore | profile | tree/  # страницы
+├── entities/             # сущности домена: Node, Tree, User (модели, zod-схемы, UI)
+├── features/             # сценарии: tree-builder, achievements, progress-tracker, auth
+├── widgets/              # крупные композиции: SkillTreePage, SkillTreeViewer, ProgressSidebar
+├── shared/
+│   ├── lib/              # prisma, auth, rateLimit, dag, logger, errorTracking, requestId
+│   ├── constants/        # статусы узлов, шаблоны, лимиты
+│   └── ui/               # Button, Modal, Toast и т.п.
+├── middleware.ts         # X-Request-Id для каждого запроса
+├── instrumentation.ts    # graceful shutdown (SIGTERM → prisma.$disconnect)
+└── tests/                # интеграционные тесты API, helpers, setup
+prisma/                   # schema.prisma, migrations/, seed.ts
+docs/                     # ARCHITECTURE.md, DEPLOYMENT.md
 ```
 
----
+## Масштабирование
 
-## 🗺️ Roadmap
+Проект рассчитан на малую/среднюю нагрузку. Выдержит рост в 10 раз без изменений кода, кроме одного места: in-memory rate limiter при >1 инстанса (заменяется на Redis-реализацию через готовый интерфейс `RateLimiter` в `shared/lib/rateLimit.ts`). Остальные компромиссы (кэш-слой, денормализация счётчика лайков, dual-secret для ротации `AUTH_SECRET`) задокументированы с триггерами к переделке — см. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), раздел «Архитектурные компромиссы».
 
-### ✅ MVP (реализовано)
-- Авторизация через GitHub
-- Просмотр skill-деревьев (ReactFlow) с DAG-пререквизитами
-- Отметка навыков как пройденных (оптимистичные обновления)
-- Полный CRUD деревьев/узлов/связей через API
-- Drag & Drop редактор с ресурсами и сложностью узлов
-- AI-генерация деревьев по теме + транзакционный импорт шаблонов
-- Публичный каталог с поиском, категориями, фильтром по сложности и сортировкой по популярности (лайки)
-- Сообщество: лайки, комментарии с модерацией, форки с атрибуцией оригинала
-- Экспорт/импорт деревьев JSON (портативный формат с zod-валидацией и лимитами)
-- Достижения, streak, профиль со статистикой
-- Кнопка «Поделиться», адаптивность, SEO-метаданные
-- Seed данные и юнит-тесты ключевой логики
-- GitHub Actions CI: типы, lint, build, проверка дрейфа миграций, интеграционные тесты на Postgres
+## Документация
 
-### 🚧 Next Features
-- [ ] Скриншот/GIF демо в README (Playwright)
-- [ ] Postgres-based rate limiting для мульт инстансов
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — FSD-структура, ER-модель, поток авторизации, архитектурные компромиссы
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — деплой (Docker/Vercel), миграции, rollback, ротация секретов, мониторинг, бэкапы
 
-### 💡 Future Ideas
-- [ ] PWA / нативное мобильное приложение
-- [ ] Публичный API для интеграций
-- [ ] Интеграция с YouTube/Notion на уровне прогресса
-- [ ] Геймификация: уровни, опыт, ежедневные квесты
+## Участие в разработке
 
----
+1. Форкните репозиторий и создайте ветку `feature/<имя>`
+2. Соблюдайте конвенции проекта: TypeScript strict, zero-any, границы server/client, FSD-направление зависимостей
+3. Убедитесь, что проходят `npm run lint`, `npx tsc --noEmit` и `npm run test`
+4. Откройте Pull Request — CI проверит типы, линт, сборку, дрейф миграций и тесты
 
-## 🤝 Вклад в проект
+## Лицензия
 
-Вклад приветствуется! Вот как вы можете помочь:
+[MIT](LICENSE)
 
-1. Fork репозиторий
-2. Создайте ветку (`git checkout -b feature/AmazingFeature`)
-3. Сделайте коммит (`git commit -m 'Add AmazingFeature'`)
-4. Запушьте ветку (`git push origin feature/AmazingFeature`)
-5. Откройте Pull Request
+## Автор
 
-### Правила кода
-- TypeScript strict mode включён
-- Zero-Any Policy
-- Server/Client boundaries
-- FSD (Feature-Sliced Design)
-- Предпочтите React Flow hooks вместо inline handlers
+[Илья](https://github.com/Ilyat9) · [Telegram](https://t.me/NeIlyat9) · afrom205@gmail.com
 
----
-
-## 📄 Лицензия
-
-Этот проект распространяется под лицензией **MIT License**.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-### Почему MIT?
-
-- ✅ Прозрачность — полный доступ к коду
-- ✅ Свобода — можно использовать в любых проектах
-- ✅ Коммерция — можно монетизировать
-- ✅ Поддержка — легко понять и доработать
-
-### Что можно делать:
-- ⬜ Использовать в коммерческих проектах
-- ⬜ Модифицировать и распространять
-- ⬜ Вносить изменения
-
-### Требуется указание авторства:
-- В комментариях в коде
-- В документации
-- В README (ссылка на оригинал)
-
----
-
-## ⚠️ Известные ограничения и путь масштабирования
-
-Проект рассчитан на малую/среднюю нагрузку и не требует переписывания при росте,
-но у каждого упрощения есть граница применимости. Полные обоснования — в
-[ARCHITECTURE.md](./docs/ARCHITECTURE.md) (раздел «Архитектурные компромиссы»),
-эксплуатация — в [DEPLOYMENT.md](./docs/DEPLOYMENT.md).
-
-| Ограничение | Что не выдержит горизонтальное масштабирование | Что делать, когда понадобится |
-|---|---|---|
-| **In-memory rate limiter** | при >1 инстанса лимиты считаются раздельно и ослабляются в N раз | реализовать `RateLimiter` на Redis и вернуть из `getRateLimiter()` в `src/shared/lib/rateLimit.ts` — интерфейс уже готов, вызывающий код менять не нужно |
-| **Нет серверного кэш-слоя** | повторные вычисления каталога на каждый запрос (частично гасится `Cache-Control: s-maxage=30`) | серверный кэш публичного листинга; до явного триггера производительности не делаем |
-| **Популярность по count-агрегату** | сортировка каталога по `likes._count` деградирует на больших объёмах | денормализованный счётчик в Tree |
-| **Один Postgres** | только вертикальное масштабирование | сначала тюнинг индексов/запросов, затем read-replica; шардинг для домена не нужен |
-| **JWT-сессии без dual-secret** | ротация `AUTH_SECRET` разлогинивает всех | поддержка двух ключей верификации (см. docs/DEPLOYMENT.md «Ротация секретов») |
-
-Что уже готово к росту нагрузки без изменений: stateless-приложение (JWT-сессии),
-миграции БД + CI-проверка дрейфа, scoped-проверки владельца, Serializable-транзакция
-создания рёбер (DAG-инвариант против гонок), пагинация каталога, лимит размера тела
-запроса, структурированные логи с `X-Request-Id`, error tracking (Sentry), graceful
-shutdown, интеграционные тесты в CI.
-
-**Если нагрузка вырастет в 10 раз:** поднять второй контейнер за балансировщиком
-(приложение stateless) и заменить rate limiter на Redis-реализацию — это единственная
-обязательная доработка (см. docs/ARCHITECTURE.md, компромисс №1).
-
----
-
-## 📞 Поддержка
-
-**Есть вопросы?** [Создайте Issue](https://github.com/Ilyat9/SkilLet/issues/new)
-
-**Готовы помочь?** Формируйте Pull Requests!
-
-### Контакты
-
-- 💬 [Telegram](https://t.me/NeIlyat9) — обсуждение и вопросы
-- 📧 Email: afrom205@gmail.com
-
----
-
-**Станьте частью сообщества SkilLet!** 🚀
-
-⭐ Поставьте звезду на GitHub, если проект вам понравился!
-
----
-
-*Автор проекта: [Илья](https://github.com/Ilyat9)*
+Вопросы и предложения — через [Issues](https://github.com/Ilyat9/SkilLet/issues/new).
