@@ -122,7 +122,16 @@ export function SkillTreeViewer({
           proOptions={{ hideAttribution: true }}
         >
           <Background />
-          <MiniMap />
+          {/* Без props MiniMap/Controls рендерятся в дефолтной светлой теме ReactFlow
+              (белая заливка) — на тёмной теме выглядят как белый артефакт. */}
+          <MiniMap
+            pannable
+            zoomable
+            bgColor="hsl(var(--card))"
+            nodeColor="hsl(var(--muted))"
+            nodeStrokeColor="hsl(var(--border))"
+            maskColor="hsl(var(--background) / 0.75)"
+          />
           <Controls />
           <Panel position="top-left">
             <div className="bg-card border border-border rounded-lg p-3 shadow-lg">

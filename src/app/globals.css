@@ -112,9 +112,30 @@
   --radius: 0.5rem;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+@layer base {
+  /* ВАЖНО: hsl(var(--foreground)) — токены хранят голые hsl-компоненты.
+     var(--foreground) как значение цвета невалидно и отбрасывается:
+     неслойное правило побеждает утилиту text-foreground на <body>,
+     и весь текст без явного класса наследует чёрный (нечитаем на тёмной теме). */
+  body {
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+  }
+}
+
+/* ReactFlow Controls не имеют пропсов темы: дефолт — белый фон кнопок,
+   слепящий на тёмной теме. Кнопки — svg внутри button, цвет задаёт fill. */
+.dark .react-flow__controls-button {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.dark .react-flow__controls-button svg {
+  fill: hsl(var(--foreground));
+}
+
+.dark .react-flow__controls-button:hover {
+  background: hsl(var(--secondary));
 }
 
 /* ---------- Микро-анимации (без framer-motion, чистый CSS) ---------- */
