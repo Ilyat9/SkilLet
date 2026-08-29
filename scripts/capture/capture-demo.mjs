@@ -104,16 +104,64 @@ await page.setCookie({
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const deselect = () => page.evaluate(() => window.getSelection()?.removeAllRanges())
 
+// Виртуальный курсор: SVG-стрелка + круг-отклик на клик. Инжектится на каждую
+// навигацию, позиция синхронизируется с реальной мышью puppeteer — screencast снимает его как настоящий.
+await page.evaluateOnNewDocument(() => {
+  const install = () => {
+    if (document.getElementById('__demo_cursor')) return
+    const cur = document.createElement('div')
+    cur.id = '__demo_cursor'
+    cur.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;transition:transform 70ms linear;will-change:transform;opacity:0;transform:translate(-100px,-100px);'
+    cur.innerHTML = '<svg width="22" height="22" viewBox="0 0 22 22"><path d="M2 1l5.5 17 3.2-7.3L18 8.4z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>'
+    document.body.appendChild(cur)
+    window.__cursorTo = (x, y) => {
+      cur.style.opacity = x > 0 || y > 0 ? '1' : '0'
+      cur.style.transform = `translate(${x}px, ${y}px)`
+    }
+    window.__ripple = (x, y) => {
+      const r = document.createElement('div')
+      r.style.cssText = `position:fixed;left:${x - 14}px;top:${y - 14}px;width:28px;height:28px;border:2px solid #34d399;border-radius:50%;pointer-events:none;z-index:2147483646;animation:__rip .45s ease-out forwards;`
+      const st = document.createElement('style')
+      st.textContent = '@keyframes __rip{from{transform:scale(.4);opacity:.9}to{transform:scale(1.6);opacity:0}}'
+      document.head.appendChild(st)
+      document.body.appendChild(r)
+      setTimeout(() => { r.remove(); st.remove() }, 500)
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install)
+  else install()
+})
+
+const toCursor = (x, y) =>
+  page.evaluate(({ x, y }) => { window.__cursorTo?.(x, y) }, { x, y })
+const clickRipple = (x, y) =>
+  page.evaluate(({ x, y }) => { window.__ripple?.(x, y) }, { x, y })
+
 async function humanMove(x, y) {
-  for (let i = 1; i <= 12; i++) { await page.mouse.move(x * (i / 12), y * (i / 12)); await wait(16) }
+  for (let i = 1; i <= 12; i++) {
+    const px = x * (i / 12), py = y * (i / 12)
+    await page.mouse.move(px, py)
+    await toCursor(px, py)
+    await wait(16)
+  }
+}
+
+async function clickAt(x, y) {
+  await clickRipple(x, y)
+  await page.mouse.click(x, y)
 }
 
 async function clickByText(text) {
   for (const h of await page.$$('button, a, [role="button"]')) {
     if ((await h.evaluate((el) => el.textContent || '')).includes(text)) {
       const box = await h.boundingBox()
-      if (box) await humanMove(box.x + box.width / 2, box.y + box.height / 2)
-      await h.click()
+      if (box) {
+        const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+        await humanMove(cx, cy)
+        await clickAt(cx, cy)
+      } else {
+        await h.click()
+      }
       return
     }
   }
@@ -135,6 +183,8 @@ await clickByText('По дате'); await wait(1600)
 await clickByText('По популярности'); await wait(1600)
 const search = await page.$('input[placeholder*="Поиск"]')
 if (search) {
+  const sb = await search.boundingBox()
+  if (sb) await humanMove(sb.x + sb.width / 2, sb.y + sb.height / 2)
   await search.click()
   await search.type('frontend', { delay: 90 })
   await wait(2000) // debounce + подгрузка
@@ -150,8 +200,11 @@ const pane = await page.$('.react-flow__pane')
 if (pane) {
   const b = await pane.boundingBox()
   const cx = b.x + b.width * 0.62, cy = b.y + b.height * 0.7
-  await page.mouse.move(cx, cy); await page.mouse.down()
-  for (let i = 1; i <= 20; i++) { await page.mouse.move(cx + 60 - i * 6, cy + 40 - i * 4); await wait(16) }
+  await page.mouse.move(cx, cy); await toCursor(cx, cy); await page.mouse.down()
+  for (let i = 1; i <= 20; i++) {
+    const px = cx + 60 - i * 6, py = cy + 40 - i * 4
+    await page.mouse.move(px, py); await toCursor(px, py); await wait(16)
+  }
   await page.mouse.up(); await deselect(); await wait(600)
   await page.mouse.move(450, 380)
   await page.mouse.wheel({ deltaY: -240 }); await wait(400)
@@ -177,7 +230,7 @@ async function markNode(title) {
   if (!target) return
   const box = await target.boundingBox()
   await humanMove(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await clickAt(box.x + box.width / 2, box.y + box.height / 2)
   await wait(800)
   await clickByText('Отметить пройденным')
   await wait(1800)
@@ -189,8 +242,12 @@ for (const title of NODES) await markNode(title)
 const like = await page.$('button[aria-label^="Поставить лайк"]')
 if (like) {
   const lb = await like.boundingBox()
-  if (lb) await humanMove(lb.x + lb.width / 2, lb.y + lb.height / 2)
-  await like.click()
+  if (lb) {
+    await humanMove(lb.x + lb.width / 2, lb.y + lb.height / 2)
+    await clickAt(lb.x + lb.width / 2, lb.y + lb.height / 2)
+  } else {
+    await like.click()
+  }
   await wait(1800)
 }
 
