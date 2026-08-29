@@ -6,6 +6,8 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+# standalone-вывод включается только для Docker-сборки (next.config.ts читает NEXT_OUTPUT)
+ENV NEXT_OUTPUT=standalone
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate

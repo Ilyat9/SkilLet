@@ -13,6 +13,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "demo:gif": "node --env-file=.env scripts/capture/capture-demo.mjs",
+    "postinstall": "prisma generate",
     "test": "vitest run"
   },
   "prisma": {

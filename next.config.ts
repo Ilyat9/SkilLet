@@ -9,7 +9,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone',
+  // standalone нужен только для self-hosted Docker-образа (см. Dockerfile).
+  // Vercel собирает стандартным пайплайном — standalone там не нужен и не используется.
+  ...(process.env.NEXT_OUTPUT === 'standalone' ? { output: 'standalone' as const } : {}),
   // Базовые security-заголовки для прод-деплоя.
   async headers() {
     return [

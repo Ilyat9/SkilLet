@@ -14,9 +14,9 @@ rate-limiting.
 
 - В проекте уже есть минимальный `Dockerfile` (multi-stage, standalone-сборка) и `docker-compose.yml`
   (postgres + one-off сервис миграций) — это готовая основа.
-- `output: 'standalone'` рассчитан именно на self-hosted/контейнер. Для Vercel serverless он не нужен:
-  если решите ехать через Vercel — уберите строку `output: 'standalone'` из `next.config.ts`
-  (файл `vercel.json` уже подготовлен), а БД возьмите ту же Neon/Vercel Postgres.
+- `output: 'standalone'` включается только при `NEXT_OUTPUT=standalone` (задаётся в
+  Dockerfile) — Docker-сборка получает standalone, Vercel — стандартный пайплайн,
+  оба сценария работают из одного `next.config.ts` (см. Сценарий C).
 
 ### База данных: Neon (managed Postgres)
 
@@ -77,13 +77,30 @@ docker-compose up --build -d        # postgres + миграции + прилож
 
 Миграции выполняет one-off сервис `migrate` (`npx prisma migrate deploy && npx prisma db seed`).
 
-## Сценарий C: Vercel (альтернатива)
+## Сценарий C: Vercel + Neon (serverless)
 
-1. Убрать `output: 'standalone'` из `next.config.ts`.
-2. Импортировать репозиторий в Vercel (`vercel.json` уже есть).
-3. Выставить переменные из чеклиста в Project Settings → Environment Variables.
-4. Применить схему локально: `DATABASE_URL=<prod> npx prisma migrate deploy`.
-5. Добавить prod callback URL в GitHub OAuth App.
+Подготовка в репозитории уже сделана: `vercel.json` (framework nextjs, регион fra1);
+`output: 'standalone'` включается только через `NEXT_OUTPUT=standalone` (Docker), поэтому
+Vercel собирает стандартным пайплайном без ручных правок; `postinstall: prisma generate`
+в package.json генерирует Prisma-клиент при сборке на Vercel.
+
+Шаги:
+
+1. Создать БД на neon.tech (Free plan), взять pooled connection string
+   (`...neon.tech/<db>?sslmode=require`) и дополнить `&connection_limit=5&pool_timeout=10`
+   (почему — см. `.env.example`: serverless-инстансы без лимита исчерпывают соединения).
+2. Импортировать репозиторий в Vercel, выставить переменные из чеклиста
+   (Project Settings → Environment Variables).
+3. Применить схему локально против облачной БД:
+   `DATABASE_URL="<neon-url>" npx prisma migrate deploy` (опционально `npx prisma db seed`).
+4. Добавить prod callback URL в GitHub OAuth App:
+   `https://<проект>.vercel.app/api/auth/callback/github`.
+5. Проверить `https://<проект>.vercel.app/api/health`.
+
+Нюансы serverless: rate-limiter in-memory действует на уровне инстанса (для
+1–2 пользователей корректно); холодный старт первой загрузки — норма Hobby-тарифа.
+Из РФ домены `*.vercel.app` у посетителей могут открываться только через VPN —
+учитывайте аудиторию.
 
 ---
 
