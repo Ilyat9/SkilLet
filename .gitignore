@@ -35,3 +35,8 @@ next-env.d.ts
 
 # codegraph index
 .codegraph/
+
+# agent skills (neon и др., машинно-локальные)
+.agents/
+.claude/
+skills-lock.json
