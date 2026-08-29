@@ -26,7 +26,7 @@ export function getTestUser(): string {
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
     `TRUNCATE "User", "Tree", "Node", "Edge", "UserProgress", "Account", "Session",
-     "VerificationToken", "Achievement", "UserAchievement" CASCADE`
+     "VerificationToken", "Achievement", "UserAchievement", "TreeLike", "Comment" CASCADE`
   )
 }
 

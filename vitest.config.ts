@@ -15,6 +15,9 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['src/tests/setup.ts'],
     globalSetup: ['src/tests/globalSetup.ts'],
+    // Интеграционные тесты делят одну общую БД (TRUNCATE между кейсами) —
+    // параллельные файлы мешали бы друг другу (уникальные id тестовых users).
+    fileParallelism: false,
     testTimeout: 30_000,
   },
 })
