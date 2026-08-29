@@ -42,8 +42,10 @@ function buildNodesData(treeKey: string, nodeDefs: NodeData[]) {
       id: `seed-${treeKey}-node-${index}`,
       title: def.title,
       description: def.description ?? null,
-      positionX: def.positionX,
-      positionY: def.positionY,
+      // Карточка узла 224px шириной (w-56) и ~120px высотой; шаг сетки координат
+      // в определениях — 100px, поэтому при записи в БД разрежаем: ×2.5 по X, ×2 по Y.
+      positionX: def.positionX * 2.5,
+      positionY: def.positionY * 2,
       difficulty: def.difficulty,
       resources,
     }
