@@ -83,6 +83,10 @@ export const RATE_LIMITS = {
   edgeDelete: { limit: 60, intervalMs: 60_000 },
   /** Отметки прогресса: щедрый лимит (клики по узлам), защита от спама. */
   progress: { limit: 60, intervalMs: 120_000 },
+  /** Лайки: клики по кнопке сердца — спам-защита, не мешающая обычному сёрфингу. */
+  like: { limit: 30, intervalMs: 60_000 },
+  /** Комментарии: защита от спама в обсуждениях. */
+  comment: { limit: 20, intervalMs: 60_000 },
   /** AI-генерация: дорогой внешний вызов — строже всех. */
   aiGenerate: { limit: 3, intervalMs: 60_000 },
 } satisfies Record<string, RateLimitOptions>

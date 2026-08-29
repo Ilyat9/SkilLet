@@ -10,6 +10,7 @@ import { parseJsonBody } from '@/shared/lib/api'
 import { checkRateLimit, RATE_LIMITS } from '@/shared/lib/rateLimit'
 import { hasCycle } from '@/shared/lib/dag'
 import { NODE_POSITION_LIMIT } from '@/shared/constants'
+import { TreeCategorySchema } from '@/entities/tree/model/schemas'
 
 /**
  * РЕШЕНИЕ ПО AI-ГЕНЕРАЦИИ (вариант «б» — реальная реализация).
@@ -40,6 +41,8 @@ const MAX_ATTEMPTS = 2
 
 const GenerateRequestSchema = z.object({
   topic: z.string().min(3, 'Тема слишком короткая').max(200, 'Слишком длинная тема'),
+  // Категория дерева: необязательна — без неё дерево сохранится как OTHER.
+  category: TreeCategorySchema.optional(),
 })
 
 const AiNodeSchema = z.object({
@@ -264,7 +267,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { topic } = validation.data
+    const { topic, category } = validation.data
     const generation = await generateValidatedTree(topic)
 
     if ('error' in generation) {
@@ -294,6 +297,7 @@ export async function POST(request: NextRequest) {
         data: {
           title: aiTree.title,
           ...(aiTree.description !== undefined ? { description: aiTree.description } : {}),
+          ...(category !== undefined ? { category } : {}),
           isPublic: true,
           authorId: userId,
           nodes: {

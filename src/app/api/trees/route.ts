@@ -8,6 +8,7 @@ import { TreeCreateSchema } from '@/entities/tree/model/schemas'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
+import { TREE_CATEGORIES } from '@/shared/constants'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,19 +19,25 @@ const MAX_PAGE_SIZE = 100
 
 type TreeSortMode = 'newest' | 'popular'
 
+/** Границы диапазона сложности для фильтра каталога (совпадают со схемой узлов). */
+const MIN_DIFFICULTY = 1
+const MAX_DIFFICULTY = 10
+
 /**
  * GET /api/trees — листинг деревьев с пагинацией.
  *
  * Параметры:
  * - scope=public|mine (обязателен) — публичный каталог или «мои деревья»;
  * - page (>=1, default 1), limit (1..100, default 20);
- * - sort=newest|popular (default newest) — популярность по числу отметок прогресса;
- * - search — поиск по названию/описанию (только для scope=public).
+ * - sort=newest|popular (default newest) — популярность по числу лайков;
+ * - search — поиск по названию/описанию (только для scope=public);
+ * - category — фильтр по категории (enum TreeCategory, только для scope=public);
+ * - minDifficulty / maxDifficulty — фильтр по СРЕДНЕЙ сложности узлов дерева.
  *
  * Кэширование (осознанное решение, без отдельного кэш-слоя):
  * - scope=public — умеренно динамичные данные: отдаём Cache-Control с
  *   s-maxage=30 + stale-while-revalidate=120 (CDN/прокси держат короткий кэш);
- * - scope=mine и всё персонализированное — no-store.
+ * - scope=mine и всё персонализированное (likedByMe) — no-store.
  */
 export async function GET(request: NextRequest) {
   const requestId = getRequestId(request)
@@ -56,18 +63,30 @@ export async function GET(request: NextRequest) {
 
     const sort: TreeSortMode = searchParams.get('sort') === 'popular' ? 'popular' : 'newest'
     const search = searchParams.get('search')?.trim() ?? ''
+    const category = searchParams.get('category')?.trim() ?? ''
+    const minDifficulty = Number(searchParams.get('minDifficulty'))
+    const maxDifficulty = Number(searchParams.get('maxDifficulty'))
 
-    let where: { isPublic?: boolean; authorId?: string; OR?: Array<Record<string, unknown>> }
+    // Сессия нужна и для scope=mine, и для персонального флага likedByMe.
+    const session = await auth()
+    const userId = session?.user?.id
+
+    let where: {
+      isPublic?: boolean
+      authorId?: string
+      category?: (typeof TREE_CATEGORIES)[number]
+      OR?: Array<Record<string, unknown>>
+      id?: { in: string[] }
+    } = {}
 
     if (scope === 'mine') {
-      const session = await auth()
-      if (!session?.user?.id) {
+      if (!userId) {
         return NextResponse.json(
           createErrorResponse('Unauthorized', 'UNAUTHORIZED'),
           { status: 401 }
         )
       }
-      where = { authorId: session.user.id }
+      where = { authorId: userId }
     } else {
       where = { isPublic: true }
       if (search) {
@@ -78,6 +97,32 @@ export async function GET(request: NextRequest) {
           { description: { contains: search, mode: 'insensitive' } },
         ]
       }
+      // Умная фильтрация по категории: enum валидируется списком —
+      // неизвестное значение просто игнорируется (пустой фильтр = «все»).
+      if (category && (TREE_CATEGORIES as readonly string[]).includes(category)) {
+        where.category = category as (typeof TREE_CATEGORIES)[number]
+      }
+    }
+
+    // Фильтр по диапазону СРЕДНЕЙ сложности дерева: агрегат по узлам выполняется
+    // заранее (groupBy + JS-фильтр вместо SQL HAVING — совместимо и прозрачно),
+    // результат — список treeId в диапазоне.
+    if (Number.isFinite(minDifficulty) || Number.isFinite(maxDifficulty)) {
+      const lo = Number.isFinite(minDifficulty) ? Math.max(MIN_DIFFICULTY, minDifficulty) : MIN_DIFFICULTY
+      const hi = Number.isFinite(maxDifficulty) ? Math.min(MAX_DIFFICULTY, maxDifficulty) : MAX_DIFFICULTY
+      if (lo <= hi) {
+        const groups = await prisma.node.groupBy({
+          by: ['treeId'],
+          _avg: { difficulty: true },
+        })
+        const treeIdsInRange = groups
+          .filter((g) => {
+            const avg = g._avg.difficulty ?? 0
+            return avg >= lo && avg <= hi
+          })
+          .map((g) => g.treeId)
+        where = { ...where, id: { in: treeIdsInRange } }
+      }
     }
 
     const [trees, total] = await prisma.$transaction([
@@ -87,22 +132,23 @@ export async function GET(request: NextRequest) {
           _count: {
             select: {
               nodes: true,
-              // Популярность дерева по ТЗ: количество UserProgress с completed=true.
+              // Метрика активности: количество отметок прогресса.
               progresses: { where: { completed: true } },
               edges: true,
+              // Честная метрика популярности каталога — лайки сообщества.
+              likes: true,
             },
           },
           author: {
             select: { id: true, name: true, image: true },
           },
         },
-        // newest → индекс Tree(isPublic, createdAt DESC).
-        // popular → агрегат по числу прогрессов (без фильтра completed: orderBy
-        // по отфильтрованному count в Prisma не поддерживается; на текущем
-        // масштабе разница несущественна, задокументировано в ARCHITECTURE.md).
+        // newest → индекс Tree(isPublic, createdAt DESC) / (+category).
+        // popular → сортировка по числу лайков (TreeLike с @@index([treeId])),
+        // createdAt — tiebreaker.
         orderBy:
           sort === 'popular'
-            ? [{ progresses: { _count: 'desc' } }, { createdAt: 'desc' }]
+            ? [{ likes: { _count: 'desc' } }, { createdAt: 'desc' }]
             : { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -110,9 +156,52 @@ export async function GET(request: NextRequest) {
       prisma.tree.count({ where }),
     ])
 
+    const treeIds = trees.map((tree) => tree.id)
+
+    // Статистика сложности узлов (avg/min/max) страницы каталога — один
+    // groupBy по treeId вместо N запросов.
+    const difficultyGroups = treeIds.length
+      ? await prisma.node.groupBy({
+          by: ['treeId'],
+          where: { treeId: { in: treeIds } },
+          _avg: { difficulty: true },
+          _min: { difficulty: true },
+          _max: { difficulty: true },
+        })
+      : []
+    const difficultyByTree = new Map(
+      difficultyGroups.map((g) => [
+        g.treeId,
+        {
+          avg: Math.round((g._avg.difficulty ?? 0) * 10) / 10,
+          min: g._min.difficulty ?? 0,
+          max: g._max.difficulty ?? 0,
+        },
+      ])
+    )
+
+    // Персональный флаг likedByMe — один запрос по странице деревьев.
+    const likedIds =
+      userId && treeIds.length
+        ? new Set(
+            (
+              await prisma.treeLike.findMany({
+                where: { userId, treeId: { in: treeIds } },
+                select: { treeId: true },
+              })
+            ).map((like) => like.treeId)
+          )
+        : new Set<string>()
+
+    const items = trees.map((tree) => ({
+      ...tree,
+      difficultyStats: difficultyByTree.get(tree.id) ?? { avg: 0, min: 0, max: 0 },
+      likedByMe: likedIds.has(tree.id),
+    }))
+
     const response = NextResponse.json(
       createSuccessResponse({
-        items: trees,
+        items,
         page,
         limit,
         total,
@@ -120,10 +209,11 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    // Cache-Control выбирается по scope (см. док-комментарий выше).
+    // Cache-Control выбирается по scope (см. док-комментарий выше). likedByMe
+    // персонален — при авторизации публичный листинг тоже не кэшируем.
     response.headers.set(
       'Cache-Control',
-      scope === 'public'
+      scope === 'public' && !userId
         ? 'public, s-maxage=30, stale-while-revalidate=120'
         : 'private, no-store'
     )
@@ -167,13 +257,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { title, description, isPublic } = validation.data
+    const { title, description, category, isPublic } = validation.data
 
     const result = await prisma.$transaction(async (tx) => {
       const tree = await tx.tree.create({
         data: {
           title,
           ...(description !== undefined ? { description } : {}),
+          ...(category !== undefined ? { category } : {}),
           ...(isPublic !== undefined ? { isPublic } : {}),
           authorId: session.user.id,
         },

@@ -24,9 +24,13 @@ export async function GET(
     const tree = await prisma.tree.findUnique({
       where: { id: treeId },
       include: {
-        _count: { select: { nodes: true, edges: true } },
+        _count: { select: { nodes: true, edges: true, likes: true, comments: true } },
         author: {
           select: { id: true, name: true, image: true },
+        },
+        // Атрибуция форка: «форк дерева «X» от @автор».
+        forkedFrom: {
+          select: { id: true, title: true, author: { select: { id: true, name: true } } },
         },
         nodes: true,
         // Рёбра запрашиваются ОДИН раз на уровне дерева: каждое ребро ранее
@@ -56,8 +60,18 @@ export async function GET(
       )
     }
 
+    // likedByMe персонален — посчитать дёшево (одна строка по уникальному индексу).
+    const likedByMe = userId
+      ? Boolean(
+          await prisma.treeLike.findUnique({
+            where: { userId_treeId: { userId, treeId } },
+            select: { id: true },
+          })
+        )
+      : false
+
     // Персонализированный ответ (прогресс текущего пользователя) — не кэшируется.
-    return NextResponse.json(createSuccessResponse(tree), {
+    return NextResponse.json(createSuccessResponse({ ...tree, likedByMe }), {
       headers: { 'Cache-Control': 'private, no-store' },
     })
   } catch (error) {
@@ -99,7 +113,7 @@ export async function PATCH(
     // Проверка владельца и мутация одним scoped-запросом (authorId в WHERE):
     // исключает TOCTOU между чтением и записью; P2025 (не найдено с учётом
     // фильтра) маппится в тот же ответ, что и «чужое дерево» — 404.
-    const { title, description, isPublic } = validation.data
+    const { title, description, category, isPublic } = validation.data
 
     let result
     try {
@@ -108,6 +122,7 @@ export async function PATCH(
         data: {
           ...(title !== undefined ? { title } : {}),
           ...(description !== undefined ? { description } : {}),
+          ...(category !== undefined ? { category } : {}),
           ...(isPublic !== undefined ? { isPublic } : {}),
         },
       })

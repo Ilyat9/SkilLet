@@ -8,7 +8,8 @@ import { auth } from '@/shared/lib/auth'
 import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/shared/lib/rateLimit'
-import { hasCycle } from '@/shared/lib/dag'
+import { sanitizeIndexConnections } from '@/shared/lib/dag'
+import { TreeCategorySchema } from '@/entities/tree/model/schemas'
 import { MAX_NODES_PER_TREE } from '@/shared/constants'
 
 export const runtime = 'nodejs'
@@ -28,6 +29,7 @@ const TemplateNodeSchema = z.object({
 const FromTemplateSchema = z.object({
   title: z.string().min(1, 'Название дерева обязательно').max(200, 'Слишком длинное название'),
   description: z.string().max(1000).optional(),
+  category: TreeCategorySchema.optional(),
   isPublic: z.boolean().optional(),
   nodes: z.array(TemplateNodeSchema).min(1, 'Шаблон должен содержать хотя бы один узел').max(MAX_NODES_PER_TREE),
   connections: z.array(z.tuple([z.number().int(), z.number().int()])),
@@ -65,34 +67,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { title, description, isPublic, nodes, connections } = validation.data
+    const { title, description, category, isPublic, nodes, connections } = validation.data
 
-    // Фильтруем связи шаблона тем же инвариантом, что и ручное создание рёбер:
-    // валидные индексы, без самопетель/дубликатов/циклов.
-    type AcceptedEdge = { sourceIndex: number; targetIndex: number }
-    const acceptedEdges: AcceptedEdge[] = []
-
-    for (const [sourceIndex, targetIndex] of connections) {
-      if (sourceIndex === targetIndex) continue
-      if (sourceIndex < 0 || sourceIndex >= nodes.length) continue
-      if (targetIndex < 0 || targetIndex >= nodes.length) continue
-      if (acceptedEdges.some((e) => e.sourceIndex === sourceIndex && e.targetIndex === targetIndex)) continue
-
-      const currentAsDag = acceptedEdges.map((e) => ({
-        sourceId: String(e.sourceIndex),
-        targetId: String(e.targetIndex),
-        treeId: 'template',
-      }))
-      if (hasCycle(currentAsDag, String(sourceIndex), String(targetIndex))) continue
-
-      acceptedEdges.push({ sourceIndex, targetIndex })
-    }
+    // Связи шаблона фильтруются общим чистым хелпером (те же инварианты, что
+    // в импорте: валидные индексы, без самопетель/дубликатов/циклов).
+    const acceptedEdges = sanitizeIndexConnections(nodes.length, connections)
 
     const tree = await prisma.$transaction(async (tx) => {
       const createdTree = await tx.tree.create({
         data: {
           title,
           ...(description !== undefined ? { description } : {}),
+          ...(category !== undefined ? { category } : {}),
           isPublic: isPublic ?? true,
           authorId: session.user.id,
           nodes: {
