@@ -10,6 +10,7 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
+  MarkerType,
   type Edge,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -87,6 +88,19 @@ export function SkillTreeViewer({
       source: edge.sourceId,
       target: edge.targetId,
       type: 'smoothstep',
+      // Направление связи — ключевая семантика графа: стрелка = «нужно пройти
+      // источник, чтобы открыть цель» (getNodeStatus). Явный усиленный маркер
+      // и цвет делают направление считываемым с одного взгляда.
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 22,
+        height: 22,
+        color: 'hsl(var(--accent-strong))',
+      },
+      style: {
+        stroke: 'hsl(var(--border))',
+        strokeWidth: 2,
+      },
     }))
 
     setReactFlowEdges(edgeConnections)
@@ -126,6 +140,13 @@ export function SkillTreeViewer({
                     </div>
                   )
                 })}
+                {/* Направление связей: единая семантика графа. */}
+                <div className="flex items-center gap-2 pt-1 border-t border-border mt-1">
+                  <span aria-hidden className="text-accent-strong font-bold">→</span>
+                  <span className="text-muted-foreground">
+                    пройди источник — откроется цель
+                  </span>
+                </div>
               </div>
             </div>
           </Panel>

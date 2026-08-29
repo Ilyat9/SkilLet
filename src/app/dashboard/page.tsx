@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { Button } from '@/shared/ui/Button'
 import { TreeCard } from '@/entities/tree/ui/TreeCard'
@@ -15,30 +15,51 @@ export default function DashboardPage() {
   const router = useRouter()
   const [trees, setTrees] = useState<TreeWithRelations[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  // Онбординг новых пользователей: если собственных деревьев нет, дашборд
+  // показывает рекомендованные публичные деревья сообщества (README: после
+  // входа пользователь сразу видит готовые деревья для изучения).
+  const [recommended, setRecommended] = useState<TreeWithRelations[]>([])
+  const [recommendedError, setRecommendedError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    } else if (status === 'authenticated') {
-      fetchTrees()
+  const fetchRecommended = useCallback(async () => {
+    try {
+      const response = await fetch('/api/trees?scope=public&sort=popular&limit=6')
+      const result = await response.json()
+      if (result.error) {
+        setRecommendedError(result.error.message)
+        return
+      }
+      setRecommended(result.data?.items ?? [])
+    } catch (error) {
+      console.error('Ошибка загрузки рекомендованных деревьев:', error)
+      setRecommendedError('Не удалось загрузить рекомендованные деревья')
     }
-  }, [status, router])
+  }, [])
 
-  const fetchTrees = async () => {
+  const fetchTrees = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch('/api/trees?scope=mine')
       const result = await response.json()
-      if (result.data) {
-        // Листинг пагинирован: { items, page, total, ... }.
-        setTrees(result.data.items ?? [])
+      const items: TreeWithRelations[] = result.data?.items ?? []
+      setTrees(items)
+      if (items.length === 0) {
+        void fetchRecommended()
       }
     } catch (error) {
       console.error('Ошибка загрузки деревьев:', error)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [fetchRecommended])
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    } else if (status === 'authenticated') {
+      void fetchTrees()
+    }
+  }, [status, router, fetchTrees])
 
   if (status === 'loading') {
     return (
@@ -103,19 +124,55 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : trees.length === 0 ? (
-          <EmptyState
-            icon={Lock}
-            title="У вас пока нет деревьев"
-            description="Создайте первое дерево или выберите публичное для изучения"
-            action={
-              <Button asChild>
-                <Link href="/tree/new">
-                  <Plus className="w-5 h-5 mr-2" />
-                  Создать дерево
-                </Link>
-              </Button>
-            }
-          />
+          <>
+            {/* Онбординг: у нового пользователя нет своих деревьев — показываем
+                готовые публичные деревья сообщества вместо пустого состояния. */}
+            <EmptyState
+              icon={Lock}
+              title="У вас пока нет деревьев"
+              description="Создайте первое дерево или начните с публичного дерева сообщества ниже"
+              action={
+                <Button asChild>
+                  <Link href="/tree/new">
+                    <Plus className="w-5 h-5 mr-2" />
+                    Создать дерево
+                  </Link>
+                </Button>
+              }
+            />
+
+            {recommendedError ? (
+              <p className="text-sm text-muted-foreground text-center" role="alert">
+                {recommendedError}
+              </p>
+            ) : recommended.length > 0 ? (
+              <section aria-labelledby="recommended-heading" className="mt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 id="recommended-heading" className="text-xl font-semibold">
+                      Рекомендуем начать отсюда
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Публичные деревья сообщества — открывайте и отмечайте прогресс
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => router.push('/explore')}>
+                    Весь каталог →
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {recommended.map((tree) => (
+                    <TreeCard
+                      key={tree.id}
+                      tree={tree}
+                      isPublic
+                      onSelect={() => router.push(`/tree/${tree.id}`)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {trees.map((tree) => (

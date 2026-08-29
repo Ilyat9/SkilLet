@@ -15,6 +15,7 @@ import { useToast } from '@/shared/ui/Toast'
 import { Button } from '@/shared/ui/Button'
 import { Modal } from '@/shared/ui/Modal'
 import { EmptyState } from '@/shared/ui/EmptyState'
+import { CommentsSection } from '@/widgets/CommentsSection'
 import {
   ArrowLeft,
   PencilLine,
@@ -24,6 +25,9 @@ import {
   X,
   ListChecks,
   Trash2,
+  Heart,
+  GitFork,
+  Download,
 } from 'lucide-react'
 
 interface ApiNodeInput extends Omit<PrismaNode, 'resources'> {
@@ -84,6 +88,12 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
   const [isDeleteTreeConfirmOpen, setIsDeleteTreeConfirmOpen] = useState(false)
   const [isDeletingTree, setIsDeletingTree] = useState(false)
 
+  // Лайки и форк: локальное состояние синхронизируется с GET /api/trees/[id].
+  const [likedByMe, setLikedByMe] = useState(false)
+  const [likes, setLikes] = useState(0)
+  const [isLikeBusy, setIsLikeBusy] = useState(false)
+  const [isForking, setIsForking] = useState(false)
+
   const handleDeleteTree = async () => {
     setIsDeletingTree(true)
     try {
@@ -124,6 +134,8 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
         nodes?: ApiNodeInput[]
         edges?: PrismaEdge[]
         progresses?: Array<{ nodeId: string; completed: boolean }>
+        likedByMe?: boolean
+        _count?: { nodes: number; edges: number; likes?: number; comments?: number }
       }
 
       // Рёбра — единственный источник: массив на уровне дерева.
@@ -131,6 +143,8 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       setTree(treeData)
       setNodes(toAppNodes(treeData.nodes ?? [], treeEdges))
       setEdges(treeEdges)
+      setLikedByMe(Boolean(treeData.likedByMe))
+      setLikes(treeData._count?.likes ?? 0)
 
       const completedIds = new Set<string>(
         (treeData.progresses ?? []).filter((p) => p.completed).map((p) => p.nodeId)
@@ -208,6 +222,107 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
     const resource = node?.resources[0]
     if (!resource) return
     window.open(resource.url, '_blank')
+  }
+
+  /** Оптимистичный тоггл лайка дерева (с rollback при ошибке). */
+  const handleToggleLike = async () => {
+    if (status !== 'authenticated') {
+      window.location.href = '/login'
+      return
+    }
+    if (isLikeBusy) return
+    setIsLikeBusy(true)
+    const prevLiked = likedByMe
+    const prevLikes = likes
+    setLikedByMe(!prevLiked)
+    setLikes(prevLikes + (prevLiked ? -1 : 1))
+    try {
+      const response = await fetch(`/api/trees/${treeId}/like`, { method: 'POST' })
+      const result = await response.json()
+      if (result.error) throw new Error(result.error.message)
+      const data = result.data as { liked: boolean; likes: number }
+      setLikedByMe(data.liked)
+      setLikes(data.likes)
+    } catch (error) {
+      console.error('Ошибка лайка:', error)
+      setLikedByMe(prevLiked)
+      setLikes(prevLikes)
+      showToast('Не удалось поставить лайк', 'error')
+    } finally {
+      setIsLikeBusy(false)
+    }
+  }
+
+  /**
+   * Форк публичного чужого дерева: создаёт копию (Tree + Node + Edge) в
+   * аккаунте текущего пользователя и открывает её.
+   */
+  const handleFork = async () => {
+    if (isForking) return
+    setIsForking(true)
+    try {
+      const response = await fetch(`/api/trees/${treeId}/fork`, { method: 'POST' })
+      const result = await response.json()
+      if (result.error) {
+        showToast(result.error.message ?? 'Не удалось форкнуть дерево', 'error')
+        return
+      }
+      showToast('Дерево скопировано в ваши деревья', 'success')
+      router.push(`/tree/${result.data.id}`)
+    } catch (error) {
+      console.error('Ошибка форка:', error)
+      showToast('Ошибка форка дерева', 'error')
+    } finally {
+      setIsForking(false)
+    }
+  }
+
+  /**
+   * Экспорт дерева в JSON (portable-формат SkilLet): скачивается файл без
+   * внутренних id — его можно импортировать через «Импортировать дерево».
+   */
+  const handleExport = () => {
+    if (!tree) return
+    const exported = {
+      format: 'skillet-tree' as const,
+      version: 1,
+      title: tree.title,
+      ...(tree.description ? { description: tree.description } : {}),
+      category: tree.category,
+      nodes: nodes.map((node) => ({
+        title: node.title,
+        ...(node.description ? { description: node.description } : {}),
+        positionX: node.positionX,
+        positionY: node.positionY,
+        difficulty: node.difficulty,
+        ...(node.resources[0]
+          ? {
+              resourceType: node.resources[0].type,
+              resourceUrl: node.resources[0].url,
+              resourceTitle: node.resources[0].title,
+            }
+          : {}),
+      })),
+      // Связи — пары локальных индексов массива nodes (формат prisma/seed.ts).
+      connections: edges
+        .map((edge) => {
+          const sourceIndex = nodes.findIndex((n) => n.id === edge.sourceId)
+          const targetIndex = nodes.findIndex((n) => n.id === edge.targetId)
+          return sourceIndex >= 0 && targetIndex >= 0 ? ([sourceIndex, targetIndex] as const) : null
+        })
+        .filter((pair): pair is readonly [number, number] => pair !== null),
+    }
+
+    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${tree.title.replace(/[^\p{L}\p{N}\s-]/gu, '').trim() || 'tree'}.skillet.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    showToast('Файл дерева скачан', 'success')
   }
 
   /** Копирует текущий URL публичного дерева в буфер обмена. */
@@ -356,6 +471,12 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       isDeleteTreeConfirmOpen={isDeleteTreeConfirmOpen}
       setIsDeleteTreeConfirmOpen={setIsDeleteTreeConfirmOpen}
       onConfirmDeleteTree={() => void handleDeleteTree()}
+      likedByMe={likedByMe}
+      likes={likes}
+      onToggleLike={() => void handleToggleLike()}
+      onFork={() => void handleFork()}
+      isForking={isForking}
+      onExport={handleExport}
     >
       {/* Содержимое основной области */}
       {!isEditMode && totalNodes === 0 ? (
@@ -389,20 +510,34 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
           }}
         />
       ) : (
-        <SkillTreeViewer
-          nodes={nodes}
-          edges={edges}
-          completedNodeIds={completedNodeIds}
-          onNodeClick={(nodeId) => void handleNodeClick(nodeId)}
-          onResourceClick={handleResourceClick}
-        />
+        <div className="space-y-4">
+          {/* Граф дерева: фиксированная высота внутри прокручиваемой области. */}
+          <div className="h-[calc(100vh-230px)] min-h-[420px]">
+            <SkillTreeViewer
+              nodes={nodes}
+              edges={edges}
+              completedNodeIds={completedNodeIds}
+              onNodeClick={(nodeId) => void handleNodeClick(nodeId)}
+              onResourceClick={handleResourceClick}
+            />
+          </div>
+          {/* Обсуждение под просмотром дерева (скрыто в редакторе). */}
+          <CommentsSection treeId={tree.id} treeAuthorId={tree.authorId} />
+        </div>
       )}
     </TreePageLayout>
   )
 }
 
 /** Разметка страницы: тулбар, основная область, desktop-сайдбар и mobile-drawer. */
-type TreeWithCount = Tree & { _count?: { nodes: number; edges: number } }
+type TreeWithCount = Tree & {
+  _count?: { nodes: number; edges: number; likes?: number; comments?: number }
+  forkedFrom?: {
+    id: string
+    title: string
+    author: { id: string; name: string | null }
+  } | null
+}
 
 interface TreePageLayoutProps {
   tree: TreeWithCount
@@ -420,6 +555,12 @@ interface TreePageLayoutProps {
   isDeleteTreeConfirmOpen: boolean
   setIsDeleteTreeConfirmOpen: (value: boolean) => void
   onConfirmDeleteTree: () => void
+  likedByMe: boolean
+  likes: number
+  onToggleLike: () => void
+  onFork: () => void
+  isForking: boolean
+  onExport: () => void
 }
 
 function TreePageLayout({
@@ -438,6 +579,12 @@ function TreePageLayout({
   isDeleteTreeConfirmOpen,
   setIsDeleteTreeConfirmOpen,
   onConfirmDeleteTree,
+  likedByMe,
+  likes,
+  onToggleLike,
+  onFork,
+  isForking,
+  onExport,
 }: TreePageLayoutProps) {
   return (
     <div className="h-screen bg-background flex flex-col">
@@ -445,7 +592,7 @@ function TreePageLayout({
       <div className="bg-card border-b border-border shrink-0">
         <div className="max-w-full px-3 sm:px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <Link href="/dashboard" className="p-2 rounded hover:bg-secondary transition-colors shrink-0">
+            <Link href="/dashboard" className="p-2 rounded hover:bg-secondary transition-colors shrink-0" aria-label="К списку деревьев">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="min-w-0">
@@ -456,6 +603,32 @@ function TreePageLayout({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Лайк: доступен на публичных деревьях (и на своих тоже). */}
+            {tree.isPublic && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onToggleLike}
+                aria-pressed={likedByMe}
+                aria-label={likedByMe ? `Убрать лайк (${likes})` : `Поставить лайк (${likes})`}
+                className={likedByMe ? 'text-destructive' : undefined}
+              >
+                <Heart className={`w-4 h-4 mr-1 ${likedByMe ? 'fill-current' : ''}`} aria-hidden />
+                {likes}
+              </Button>
+            )}
+            {/* Форк: доступен на публичных деревьях — копия уходит авторизованному пользователю. */}
+            {tree.isPublic && (
+              <Button size="sm" variant="ghost" onClick={onFork} disabled={isForking}>
+                <GitFork className="w-4 h-4 mr-1" aria-hidden />
+                <span className="hidden sm:inline">{isForking ? 'Копируем…' : 'Форкнуть'}</span>
+              </Button>
+            )}
+            {/* Экспорт: скачанный JSON можно импортировать на /tree/new. */}
+            <Button size="sm" variant="ghost" onClick={onExport} aria-label="Экспортировать дерево в JSON">
+              <Download className="w-4 h-4 mr-1" aria-hidden />
+              <span className="hidden sm:inline">Экспорт</span>
+            </Button>
             {/* Кнопка «Поделиться» видна только у публичных деревьев. */}
             {tree.isPublic && (
               <Button size="sm" variant="ghost" onClick={onShare}>
@@ -482,10 +655,23 @@ function TreePageLayout({
             )}
           </div>
         </div>
+        {/* Атрибуция форка: «форк дерева «X» от @автор» — ссылка на оригинал. */}
+        {tree.forkedFrom && (
+          <div className="px-3 sm:px-4 pb-2 -mt-1">
+            <p className="text-xs text-muted-foreground">
+              Форк дерева{' '}
+              <Link href={`/tree/${tree.forkedFrom.id}`} className="text-primary underline underline-offset-2">
+                «{tree.forkedFrom.title}»
+              </Link>{' '}
+              от @{tree.forkedFrom.author.name || 'пользователя'}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 min-h-0 relative">
-        <div className="flex-1 min-w-0 p-2 sm:p-4 overflow-hidden">{children}</div>
+        {/* Прокручиваемая основная область: граф + комментарии под ним. */}
+        <div className="flex-1 min-w-0 p-2 sm:p-4 overflow-y-auto">{children}</div>
 
         {/* Desktop: фиксированный сайдбар справа; на мобильных скрыт. */}
         {!isEditMode && (

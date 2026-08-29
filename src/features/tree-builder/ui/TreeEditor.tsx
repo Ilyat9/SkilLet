@@ -1,7 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Panel } from '@xyflow/react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  Panel,
+  useOnSelectionChange,
+  type Connection,
+} from '@xyflow/react'
 import { useTreeEditor, type EditorNode, type EditorEdge } from '@/features/tree-builder/model/useTreeEditor'
 import { Button } from '@/shared/ui/Button'
 import { Badge } from '@/shared/ui/Badge'
@@ -45,9 +54,8 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
   const selectedNode = editor.nodes.find((n) => n.id === selectedNodeId)
   const isSelectedNodeBusy = selectedNodeId ? editor.busyIds.has(`node:${selectedNodeId}`) : false
 
-  const handleNodeClick = (_e: React.MouseEvent, node: EditorNode) => {
-    setSelectedEdgeId(null)
-    setSelectedNodeId(node.id)
+  // Заполняет панель редактирования данными выбранного узла.
+  const fillNodeForm = useCallback((node: EditorNode) => {
     setTitle(node.data.title)
     setDescription(node.data.description ?? '')
     setDifficulty(node.data.difficulty)
@@ -61,7 +69,50 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
       setResourceUrl('')
       setResourceTitle('')
     }
-  }
+  }, [])
+
+  // Правило кода: обработчики React Flow — через хуки, а не inline-функции
+  // в JSX-пропах. Выделение узла/ребра обрабатывается хуком useOnSelectionChange.
+  useOnSelectionChange({
+    onChange: ({ nodes: selectedNodes, edges: selectedEdges }) => {
+      const firstNode = selectedNodes[0] as EditorNode | undefined
+      const firstEdge = selectedEdges[0]
+      if (firstNode) {
+        setSelectedEdgeId(null)
+        setSelectedNodeId(firstNode.id)
+        fillNodeForm(firstNode)
+      } else if (firstEdge) {
+        setSelectedNodeId(null)
+        setSelectedEdgeId(firstEdge.id)
+      }
+    },
+  })
+
+  // onConnect / onNodeDragStop — стабильные колбэки вместо inline-функций.
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      void editor.onConnect(connection).then(() => onChanged?.())
+    },
+    [editor, onChanged]
+  )
+
+  const handleNodeDragStop = useCallback(
+    (_event: unknown, node: EditorNode) => {
+      void editor.saveNodePosition(node.id, Math.round(node.position.x), Math.round(node.position.y))
+    },
+    [editor]
+  )
+
+  const handleNodeClick = useCallback((_e: React.MouseEvent, node: EditorNode) => {
+    setSelectedEdgeId(null)
+    setSelectedNodeId(node.id)
+    fillNodeForm(node)
+  }, [fillNodeForm])
+
+  const handleEdgeClick = useCallback((_e: React.MouseEvent, edge: EditorEdge) => {
+    setSelectedNodeId(null)
+    setSelectedEdgeId(edge.id)
+  }, [])
 
   const handleSaveContent = async () => {
     if (!selectedNodeId) return
@@ -116,17 +167,10 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
         edges={editor.edges}
         onNodesChange={editor.onNodesChange}
         onEdgesChange={editor.onEdgesChange}
-        onConnect={(c) => {
-          void editor.onConnect(c).then(() => onChanged?.())
-        }}
+        onConnect={handleConnect}
         onNodeClick={handleNodeClick}
-        onEdgeClick={(_e, edge) => {
-          setSelectedNodeId(null)
-          setSelectedEdgeId(edge.id)
-        }}
-        onNodeDragStop={(_e, node) =>
-          void editor.saveNodePosition(node.id, Math.round(node.position.x), Math.round(node.position.y))
-        }
+        onEdgeClick={handleEdgeClick}
+        onNodeDragStop={handleNodeDragStop}
         fitView
         defaultEdgeOptions={{ type: 'smoothstep' }}
       >

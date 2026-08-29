@@ -1,19 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/shared/ui/Button'
 import { Modal } from '@/shared/ui/Modal'
 import { TEMPLATES, type SkillTemplate } from '@/shared/constants/templates'
+import { TREE_CATEGORIES, TREE_CATEGORY_LABELS, type TreeCategoryValue } from '@/shared/constants'
+import { TreeExportSchema } from '@/entities/tree/model/schemas'
 import { cn } from '@/shared/lib/utils'
-import { Loader2, ArrowLeft, Sparkles } from 'lucide-react'
+import { Loader2, ArrowLeft, Sparkles, FileUp, FileWarning } from 'lucide-react'
 
-type CreateMode = 'templates' | 'ai'
+type CreateMode = 'templates' | 'ai' | 'import'
 
 export default function NewTreePage() {
   const router = useRouter()
   const [mode, setMode] = useState<CreateMode>('templates')
+  // Категория: разумный дефолт OTHER, пользователь может выбрать осмысленную
+  // до создания (пустое дерево, AI); шаблоны несут категорию по умолчанию.
+  const [category, setCategory] = useState<TreeCategoryValue>('OTHER')
 
   // Общее состояние «создать пустое дерево»
   const [isCreatingEmpty, setIsCreatingEmpty] = useState(false)
@@ -29,6 +34,11 @@ export default function NewTreePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
+  // Состояние импорта из файла
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   /** Создаёт ПУСТОЕ дерево и переходит в редактор. */
   const handleCreateEmpty = async () => {
     setIsCreatingEmpty(true)
@@ -40,6 +50,7 @@ export default function NewTreePage() {
         body: JSON.stringify({
           title: 'Новое дерево',
           description: '',
+          category,
           isPublic: false,
         }),
       })
@@ -75,6 +86,7 @@ export default function NewTreePage() {
         body: JSON.stringify({
           title: template.title,
           description: template.description,
+          category: template.category,
           isPublic: false,
           nodes: template.nodes,
           connections: template.connections,
@@ -106,7 +118,7 @@ export default function NewTreePage() {
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim() }),
+        body: JSON.stringify({ topic: topic.trim(), category }),
       })
       const result = await response.json()
       if (result.error) {
@@ -119,6 +131,54 @@ export default function NewTreePage() {
       setAiError('Ошибка AI-генерации. Попробуйте ещё раз.')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  /**
+   * Импорт дерева из .json файла формата SkilLet: клиентская zod-валидация
+   * (та же схема, что на сервере) + POST /api/trees/import. Дерево создаётся
+   * под текущим пользователем приватным.
+   */
+  const handleImportFile = async (file: File) => {
+    setImportError(null)
+    // Защита от аномально больших файлов до чтения (лимит API-тела — 1 MiB).
+    if (file.size > 1024 * 1024) {
+      setImportError('Файл слишком большой (максимум 1 МБ)')
+      return
+    }
+    setIsImporting(true)
+    try {
+      const text = await file.text()
+      let parsedJson: unknown
+      try {
+        parsedJson = JSON.parse(text)
+      } catch {
+        setImportError('Файл не является корректным JSON')
+        return
+      }
+      // Ранняя валидация на клиенте: понятная ошибка до сетевого запроса.
+      const validation = TreeExportSchema.safeParse(parsedJson)
+      if (!validation.success) {
+        setImportError(validation.error.errors[0]?.message ?? 'Файл не соответствует формату SkilLet')
+        return
+      }
+
+      const response = await fetch('/api/trees/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validation.data),
+      })
+      const result = await response.json()
+      if (result.error) {
+        setImportError(result.error.message)
+        return
+      }
+      router.push(`/tree/${result.data.id}`)
+    } catch (err) {
+      console.error('Ошибка импорта дерева:', err)
+      setImportError('Ошибка импорта дерева')
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -142,11 +202,12 @@ export default function NewTreePage() {
           </div>
 
           {/* Вкладки способа создания */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-secondary rounded-lg mb-6" role="tablist">
+          <div className="grid grid-cols-3 gap-2 p-1 bg-secondary rounded-lg mb-6" role="tablist">
             {(
               [
                 { id: 'templates', label: 'Шаблоны' },
                 { id: 'ai', label: 'AI-генерация' },
+                { id: 'import', label: 'Импорт' },
               ] as const
             ).map((tab) => (
               <button
@@ -156,7 +217,7 @@ export default function NewTreePage() {
                 aria-selected={mode === tab.id}
                 onClick={() => setMode(tab.id)}
                 className={cn(
-                  'py-2 px-3 rounded-md text-sm font-medium transition-colors',
+                  'py-2 px-2 rounded-md text-sm font-medium transition-colors',
                   mode === tab.id
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground'
@@ -166,6 +227,32 @@ export default function NewTreePage() {
               </button>
             ))}
           </div>
+
+          {/* Выбор категории: обязателен для пустого дерева и AI (дефолт OTHER);
+              шаблоны и импорт несут категорию в своих данных. */}
+          {(mode === 'templates' || mode === 'ai') && (
+            <div className="mb-6">
+              <label htmlFor="tree-category" className="block text-sm font-medium mb-1">
+                Категория
+              </label>
+              <select
+                id="tree-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as TreeCategoryValue)}
+                disabled={isCreatingEmpty || isGenerating}
+                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+              >
+                {TREE_CATEGORIES.map((value) => (
+                  <option key={value} value={value}>
+                    {TREE_CATEGORY_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-text-tertiary mt-1">
+                Шаблоны подставляют свою категорию автоматически.
+              </p>
+            </div>
+          )}
 
           {/* Панель «создать пустое дерево» — доступна из обеих вкладок */}
           <div className="space-y-3">
@@ -183,6 +270,48 @@ export default function NewTreePage() {
               >
                 Выбрать шаблон
               </Button>
+            ) : mode === 'import' ? (
+              <div className="space-y-3 pt-2 border-t border-border mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Загрузите файл <code className="text-xs bg-secondary px-1 rounded">.json</code>, ранее
+                  экспортированный из SkilLet («Экспорт» на странице дерева). Дерево создастся
+                  приватным и будет принадлежать вам.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleImportFile(file)
+                    // Позволяем выбрать тот же файл повторно.
+                    e.target.value = ''
+                  }}
+                  disabled={isImporting}
+                  aria-label="Файл дерева в формате JSON"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  variant="secondary"
+                  className="w-full"
+                  size="lg"
+                >
+                  {isImporting ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <FileUp className="w-5 h-5 mr-2" />
+                  )}
+                  {isImporting ? 'Импортируем…' : 'Выбрать файл'}
+                </Button>
+                {importError && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/40 rounded-lg">
+                    <FileWarning className="w-4 h-4 text-destructive shrink-0 mt-0.5" aria-hidden />
+                    <p className="text-destructive text-sm">{importError}</p>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-3 pt-2 border-t border-border mt-4">
                 <label htmlFor="ai-topic" className="block text-sm font-medium">

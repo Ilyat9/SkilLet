@@ -6,6 +6,8 @@ import { TreeCard } from '@/entities/tree/ui/TreeCard'
 import type { Tree } from '@/entities/tree/model/types'
 import { Button } from '@/shared/ui/Button'
 import { EmptyState } from '@/shared/ui/EmptyState'
+import { useAuth } from '@/features/auth/ui/useAuth'
+import { TREE_CATEGORIES, TREE_CATEGORY_LABELS, type TreeCategoryValue } from '@/shared/constants'
 import { Search, Compass, AlertTriangle, SearchX, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type SortMode = 'newest' | 'popular'
@@ -19,18 +21,25 @@ interface TreesPage {
 }
 
 const PAGE_SIZE = 20
+const DIFFICULTY_MIN = 1
+const DIFFICULTY_MAX = 10
 
 export default function ExplorePage() {
   const router = useRouter()
+  const { status } = useAuth()
   const [trees, setTrees] = useState<TreesPage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('popular')
   const [page, setPage] = useState(1)
+  // Умная фильтрация: категория + диапазон средней сложности дерева.
+  const [category, setCategory] = useState<TreeCategoryValue | ''>('')
+  const [minDifficulty, setMinDifficulty] = useState(DIFFICULTY_MIN)
+  const [maxDifficulty, setMaxDifficulty] = useState(DIFFICULTY_MAX)
 
-  // Поиск и сортировка выполняются на сервере (пагинация делает клиентский
-  // фильтр по всем деревьям невозможным). Debounce 400мс на ввод.
+  // Поиск, сортировка и фильтры выполняются на сервере (пагинация делает
+  // клиентский фильтр по всем деревьям невозможным). Debounce 400мс на ввод.
   const fetchPublicTrees = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -42,6 +51,10 @@ export default function ExplorePage() {
         limit: String(PAGE_SIZE),
       })
       if (searchQuery.trim()) params.set('search', searchQuery.trim())
+      if (category) params.set('category', category)
+      // Фильтр сложности шлём только когда он сужает полный диапазон.
+      if (minDifficulty > DIFFICULTY_MIN) params.set('minDifficulty', String(minDifficulty))
+      if (maxDifficulty < DIFFICULTY_MAX) params.set('maxDifficulty', String(maxDifficulty))
 
       const response = await fetch(`/api/trees?${params.toString()}`)
       const result = await response.json()
@@ -56,7 +69,7 @@ export default function ExplorePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [searchQuery, sortMode, page])
+  }, [searchQuery, sortMode, page, category, minDifficulty, maxDifficulty])
 
   useEffect(() => {
     const timer = window.setTimeout(() => void fetchPublicTrees(), 400)
@@ -66,6 +79,39 @@ export default function ExplorePage() {
   const changeSort = (mode: SortMode) => {
     setSortMode(mode)
     setPage(1)
+  }
+
+  const changeCategory = (value: TreeCategoryValue | '') => {
+    setCategory(value)
+    setPage(1)
+  }
+
+  /** Оптимистичный тоггл лайка: счётчик и состояние меняются сразу, откат при ошибке. */
+  const toggleLike = async (tree: Tree) => {
+    if (status !== 'authenticated') {
+      router.push('/login')
+      return
+    }
+    const patchItem = (item: Tree, likedByMe: boolean, likes: number): Tree =>
+      item.id === tree.id
+        ? { ...item, likedByMe, _count: { nodes: item._count?.nodes ?? 0, progresses: item._count?.progresses, edges: item._count?.edges, likes } }
+        : item
+
+    const optimisticLikes = (tree._count?.likes ?? 0) + (tree.likedByMe ? -1 : 1)
+    setTrees((prev) => (prev ? { ...prev, items: prev.items.map((item) => patchItem(item, !tree.likedByMe, optimisticLikes)) } : prev))
+
+    try {
+      const response = await fetch(`/api/trees/${tree.id}/like`, { method: 'POST' })
+      const result = await response.json()
+      if (result.error) throw new Error(result.error.message)
+      const { liked, likes } = result.data as { liked: boolean; likes: number }
+      // Синхронизируем с серверным состоянием (гонки/лимиты).
+      setTrees((prev) => (prev ? { ...prev, items: prev.items.map((item) => patchItem(item, liked, likes)) } : prev))
+    } catch (err) {
+      console.error('Ошибка лайка:', err)
+      // Rollback оптимистичного обновления.
+      setTrees((prev) => (prev ? { ...prev, items: prev.items.map((item) => patchItem(item, Boolean(tree.likedByMe), tree._count?.likes ?? 0)) } : prev))
+    }
   }
 
   return (
@@ -82,7 +128,7 @@ export default function ExplorePage() {
         </div>
 
         {/* Поиск и сортировка */}
-        <div className="flex flex-col md:flex-row gap-3 mb-8">
+        <div className="flex flex-col md:flex-row gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -106,7 +152,8 @@ export default function ExplorePage() {
                 key={option.id}
                 type="button"
                 onClick={() => changeSort(option.id)}
-                className={`px-3 py-2 rounded-md text-sm border transition-colors ${
+                aria-pressed={sortMode === option.id}
+                className={`px-3 py-2 rounded-md text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   sortMode === option.id
                     ? 'border-primary text-primary'
                     : 'border-border text-muted-foreground hover:text-foreground'
@@ -115,6 +162,78 @@ export default function ExplorePage() {
                 {option.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Умная фильтрация: категория + диапазон средней сложности */}
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-8 p-3 bg-card border border-border rounded-lg">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Фильтр по категории">
+            <button
+              type="button"
+              onClick={() => changeCategory('')}
+              aria-pressed={category === ''}
+              className={`px-3 py-1.5 rounded-full text-xs border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                category === ''
+                  ? 'border-primary text-primary bg-primary/10'
+                  : 'border-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Все категории
+            </button>
+            {TREE_CATEGORIES.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => changeCategory(value)}
+                aria-pressed={category === value}
+                className={`px-3 py-1.5 rounded-full text-xs border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  category === value
+                    ? 'border-primary text-primary bg-primary/10'
+                    : 'border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {TREE_CATEGORY_LABELS[value]}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 lg:ml-auto shrink-0">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Сложность</span>
+            <input
+              type="range"
+              min={DIFFICULTY_MIN}
+              max={DIFFICULTY_MAX}
+              value={minDifficulty}
+              onChange={(e) => {
+                const value = Number(e.target.value)
+                setMinDifficulty(Math.min(value, maxDifficulty))
+                setPage(1)
+              }}
+              className="w-24 accent-[hsl(var(--primary))]"
+              aria-label="Минимальная средняя сложность дерева"
+            />
+            <span className="text-sm text-foreground w-6 text-center" aria-live="polite">
+              {minDifficulty}
+            </span>
+            <span className="text-xs text-muted-foreground" aria-hidden>
+              —
+            </span>
+            <input
+              type="range"
+              min={DIFFICULTY_MIN}
+              max={DIFFICULTY_MAX}
+              value={maxDifficulty}
+              onChange={(e) => {
+                const value = Number(e.target.value)
+                setMaxDifficulty(Math.max(value, minDifficulty))
+                setPage(1)
+              }}
+              className="w-24 accent-[hsl(var(--primary))]"
+              aria-label="Максимальная средняя сложность дерева"
+            />
+            <span className="text-sm text-foreground w-6 text-center" aria-live="polite">
+              {maxDifficulty}
+            </span>
           </div>
         </div>
 
@@ -155,6 +274,8 @@ export default function ExplorePage() {
                   key={tree.id}
                   tree={tree}
                   isPublic
+                  canLike
+                  onToggleLike={(t) => void toggleLike(t)}
                   onSelect={() => router.push(`/tree/${tree.id}`)}
                 />
               ))}
