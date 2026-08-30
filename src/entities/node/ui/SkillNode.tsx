@@ -47,7 +47,11 @@ export function SkillNode({ node, status, isInteractive = false, onNodeClick, on
       aria-label={`Навык «${node.title}», статус: ${config.label}`}
       aria-disabled={!isInteractive}
     >
-      <div className="flex items-center gap-2 mb-2">
+      {/* Непрозрачная подложка + статусный тинт поверх: рёбра графа не просвечивают. */}
+      {config.overlay !== '' && (
+        <div aria-hidden className={cn('pointer-events-none absolute inset-0 rounded-md', config.overlay)} />
+      )}
+      <div className="relative flex items-center gap-2 mb-2">
         <span className={cn('text-base leading-none', config.textColor)} aria-hidden>
           {config.icon}
         </span>
@@ -55,13 +59,13 @@ export function SkillNode({ node, status, isInteractive = false, onNodeClick, on
       </div>
 
       {node.description && (
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+        <p className="relative text-xs text-muted-foreground mb-3 line-clamp-2">
           {node.description}
         </p>
       )}
 
       {status !== NODE_STATUS.LOCKED && (
-        <div className="mb-3">
+        <div className="relative mb-3">
           <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-muted-foreground">Сложность: {node.difficulty}/10</span>
           </div>
@@ -78,7 +82,7 @@ export function SkillNode({ node, status, isInteractive = false, onNodeClick, on
           }}
           aria-label="Открыть материалы навыка"
           className={cn(
-            'flex items-center justify-center gap-1 text-xs',
+            'relative flex items-center justify-center gap-1 text-xs',
             'bg-primary/10 text-primary hover:bg-primary/20',
             'px-3 py-1.5 rounded transition-colors w-full',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'

@@ -15,25 +15,28 @@ export type NodeStatus = (typeof NODE_STATUS)[keyof typeof NODE_STATUS]
  */
 export const NODE_STATUS_CONFIG: Record<
   NodeStatus,
-  { color: string; textColor: string; icon: string; label: string }
+  { color: string; textColor: string; icon: string; label: string; overlay: string }
 > = {
   [NODE_STATUS.LOCKED]: {
-    color: 'border-border bg-muted/40',
+    color: 'border-border bg-card',
     textColor: 'text-muted-foreground',
     icon: '🔒',
     label: 'заблокирован',
+    overlay: 'bg-muted/30',
   },
   [NODE_STATUS.AVAILABLE]: {
-    color: 'border-accent bg-card/60',
+    color: 'border-accent bg-card',
     textColor: 'text-accent-strong',
     icon: '⚡',
     label: 'доступен',
+    overlay: '',
   },
   [NODE_STATUS.DONE]: {
-    color: 'border-success bg-success/10',
+    color: 'border-success bg-card',
     textColor: 'text-success',
     icon: '✓',
     label: 'пройден',
+    overlay: 'bg-success/10',
   },
 }
 
