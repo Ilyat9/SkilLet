@@ -202,8 +202,15 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
     }
   }
 
-  // Выбранный узел + сколько заблокированных детей он откроет (для карточки в сайдбаре).
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null
+  // При выборе узла подтягиваем его пункт списка в видимую область сайдбара —
+  // карточка раскрывается под пунктом и должна быть видна.
+  useEffect(() => {
+    if (!selectedNodeId) return
+    document
+      .querySelector(`[data-node-id="${selectedNodeId}"]`)
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedNodeId])
+
   const unlockCountFor = (nodeId: string) =>
     edges.filter((e) => {
       if (e.sourceId !== nodeId) return false
@@ -481,28 +488,6 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
 
       <ProgressSidebar totalNodes={totalNodes} completedNodes={completedNodes} />
 
-      {/* Карточка выбранного навыка: описание, материалы, отметка пройденным. */}
-      {selectedNode && (
-        <div className="mt-4">
-          <NodeDetailsCard
-            node={selectedNode}
-            status={getNodeStatus(selectedNode, completedNodeIds)}
-            completedNodeIds={completedNodeIds}
-            isCompleted={completedNodeIds.has(selectedNode.id)}
-            blockedByTitle={blockedByTitle(selectedNode)}
-            unlockHint={
-              completedNodeIds.has(selectedNode.id)
-                ? 'Навык засчитан в прогресс и streak.'
-                : unlockCountFor(selectedNode.id) > 0
-                  ? `Отметка пройденным откроет ${unlockCountFor(selectedNode.id)} след. навык(ов).`
-                  : 'Отметка пройденным засчитает навык.'
-            }
-            onToggle={(completed) => handleToggleProgress(selectedNode.id, completed)}
-            onClose={() => setSelectedNodeId(null)}
-          />
-        </div>
-      )}
-
       {/* Список навыков по статусам: названия видны всегда, заблокированные — с причиной. */}
       <div className="mt-4 space-y-4">
         {statusGroups.map(
@@ -518,9 +503,10 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
                     const isLocked = getNodeStatus(node, completedNodeIds) === NODE_STATUS.LOCKED
                     const blocker = isLocked ? blockedByTitle(node) : null
                     return (
-                      <li key={node.id}>
+                      <li key={node.id} data-node-id={node.id}>
                         <button
                           onClick={() => handleNodeSelect(node.id)}
+                          aria-expanded={isSelected}
                           className={cn(
                             'w-full text-left px-2 py-1.5 rounded-md flex items-start gap-2 transition-colors',
                             isSelected ? 'bg-secondary' : 'hover:bg-secondary/60'
@@ -542,6 +528,27 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
                             )}
                           </span>
                         </button>
+                        {/* Карточка навыка раскрывается прямо под выбранным пунктом. */}
+                        {isSelected && (
+                          <div className="mt-1.5 mb-2">
+                            <NodeDetailsCard
+                              node={node}
+                              status={getNodeStatus(node, completedNodeIds)}
+                              completedNodeIds={completedNodeIds}
+                              isCompleted={completedNodeIds.has(node.id)}
+                              blockedByTitle={blockedByTitle(node)}
+                              unlockHint={
+                                completedNodeIds.has(node.id)
+                                  ? 'Навык засчитан в прогресс и streak.'
+                                  : unlockCountFor(node.id) > 0
+                                    ? `Отметка пройденным откроет ${unlockCountFor(node.id)} след. навык(ов).`
+                                    : 'Отметка пройденным засчитает навык.'
+                              }
+                              onToggle={(completed) => handleToggleProgress(node.id, completed)}
+                              onClose={() => setSelectedNodeId(null)}
+                            />
+                          </div>
+                        )}
                       </li>
                     )
                   })}

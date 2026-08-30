@@ -50,12 +50,14 @@ console.log('body-start:', JSON.stringify(bodyStart))
 await page.waitForSelector('.react-flow__node', { timeout: 30000 })
 await new Promise((r) => setTimeout(r, 1500))
 
-// DOM-клик по узлу «Старт» — карточка навыка должна появиться в сайдбаре справа.
+// DOM-клик по первому интерактивному узлу — карточка навыка должна появиться в сайдбаре.
 const clicked = await page.evaluate(() => {
   const nodes = document.querySelectorAll('.react-flow__node [role="button"]')
   for (const n of nodes) {
     if ((n.textContent || '').includes('Старт')) { n.click(); return true }
   }
+  const first = nodes[0]
+  if (first) { first.click(); return true }
   return false
 })
 console.log('dom-click-dispatched:', clicked)
