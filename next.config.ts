@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'api.dicebear.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+      },
     ],
   },
   // standalone нужен только для self-hosted Docker-образа (см. Dockerfile).
@@ -56,7 +60,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https://api.dicebear.com",
+              "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com",
               "connect-src 'self'",
               "font-src 'self'",
               "object-src 'none'",

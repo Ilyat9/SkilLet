@@ -11,6 +11,12 @@ const baseStats = {
   ownTreesCount: 0,
   maxNodesInOwnTree: 0,
   hasOwnTreeWith10PlusEdges: false,
+  currentStreak: 0,
+  distinctTreesStarted: 0,
+  commentsWritten: 0,
+  likesReceived: 0,
+  fullyCompletedTrees: 0,
+  lastProgressHourUtc: null,
 }
 
 describe('computeNextStreak', () => {
@@ -136,6 +142,7 @@ describe('computeEarnedAchievementCodes', () => {
 
   it('все условия одновременно — выданы все пять', () => {
     const codes = computeEarnedAchievementCodes({
+      ...baseStats,
       totalCompletedNodes: 25,
       isTreeFullyCompleted: true,
       ownTreesCount: 2,
@@ -143,5 +150,97 @@ describe('computeEarnedAchievementCodes', () => {
       hasOwnTreeWith10PlusEdges: true,
     })
     expect(codes).toHaveLength(5)
+  })
+
+  it('«Огонь»: серия 7 дней', () => {
+    expect(computeEarnedAchievementCodes({ ...baseStats, currentStreak: 6 })).not.toContain(
+      ACHIEVEMENT_CODES.STREAK_WEEK
+    )
+    expect(computeEarnedAchievementCodes({ ...baseStats, currentStreak: 7 })).toContain(
+      ACHIEVEMENT_CODES.STREAK_WEEK
+    )
+  })
+
+  it('«Исследователь»: 5 разных деревьев', () => {
+    expect(computeEarnedAchievementCodes({ ...baseStats, distinctTreesStarted: 4 })).not.toContain(
+      ACHIEVEMENT_CODES.EXPLORER
+    )
+    expect(computeEarnedAchievementCodes({ ...baseStats, distinctTreesStarted: 5 })).toContain(
+      ACHIEVEMENT_CODES.EXPLORER
+    )
+  })
+
+  it('«Голос сообщества»: 3 комментария', () => {
+    expect(computeEarnedAchievementCodes({ ...baseStats, commentsWritten: 2 })).not.toContain(
+      ACHIEVEMENT_CODES.VOICE
+    )
+    expect(computeEarnedAchievementCodes({ ...baseStats, commentsWritten: 3 })).toContain(
+      ACHIEVEMENT_CODES.VOICE
+    )
+  })
+
+  it('«Любимец публики»: 5 лайков на своих деревьях', () => {
+    expect(computeEarnedAchievementCodes({ ...baseStats, likesReceived: 4 })).not.toContain(
+      ACHIEVEMENT_CODES.FAVORITE
+    )
+    expect(computeEarnedAchievementCodes({ ...baseStats, likesReceived: 5 })).toContain(
+      ACHIEVEMENT_CODES.FAVORITE
+    )
+  })
+
+  it('«Куратор»: 3 своих дерева', () => {
+    expect(computeEarnedAchievementCodes({ ...baseStats, ownTreesCount: 2 })).not.toContain(
+      ACHIEVEMENT_CODES.CURATOR
+    )
+    expect(computeEarnedAchievementCodes({ ...baseStats, ownTreesCount: 3 })).toContain(
+      ACHIEVEMENT_CODES.CURATOR
+    )
+  })
+
+  it('«Сотка»: 100 узлов суммарно', () => {
+    expect(computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 99 })).not.toContain(
+      ACHIEVEMENT_CODES.CENTURION
+    )
+    expect(computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 100 })).toContain(
+      ACHIEVEMENT_CODES.CENTURION
+    )
+  })
+
+  it('секретная «Ночная сова»: отметка ночью (22–05 UTC) при наличии прогресса', () => {
+    expect(
+      computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 1, lastProgressHourUtc: 23 })
+    ).toContain(ACHIEVEMENT_CODES.NIGHT_OWL)
+    expect(
+      computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 1, lastProgressHourUtc: 3 })
+    ).toContain(ACHIEVEMENT_CODES.NIGHT_OWL)
+    // Днём — нет.
+    expect(
+      computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 1, lastProgressHourUtc: 12 })
+    ).not.toContain(ACHIEVEMENT_CODES.NIGHT_OWL)
+    // Ночью, но без единого узла — нет (нечем отметить).
+    expect(
+      computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 0, lastProgressHourUtc: 23 })
+    ).not.toContain(ACHIEVEMENT_CODES.NIGHT_OWL)
+  })
+
+  it('секретный «Перфекционист»: 3 дерева полностью', () => {
+    expect(
+      computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 10, fullyCompletedTrees: 2 })
+    ).not.toContain(ACHIEVEMENT_CODES.PERFECTIONIST)
+    expect(
+      computeEarnedAchievementCodes({ ...baseStats, totalCompletedNodes: 15, fullyCompletedTrees: 3 })
+    ).toContain(ACHIEVEMENT_CODES.PERFECTIONIST)
+  })
+
+  it('каталог содержит только известные коды, секретные помечены', async () => {
+    const { ACHIEVEMENT_DEFS } = await import('./gamification')
+    const knownCodes = new Set(Object.values(ACHIEVEMENT_CODES))
+    for (const def of ACHIEVEMENT_DEFS) {
+      expect(knownCodes.has(def.code)).toBe(true)
+    }
+    expect(ACHIEVEMENT_DEFS.filter((d) => d.secret).map((d) => d.code)).toEqual([
+      ACHIEVEMENT_CODES.NIGHT_OWL,
+      ACHIEVEMENT_CODES.PERFECTIONIST,
+    ])
   })
 })

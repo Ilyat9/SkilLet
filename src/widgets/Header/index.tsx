@@ -3,51 +3,55 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
+import { useProfileSummary } from './useProfileSummary'
 import { Button } from '@/shared/ui/Button'
 import { ThemeToggle } from '@/shared/ui/ThemeToggle'
 import { Flame, LogOut, Menu, X } from 'lucide-react'
 
-interface StreakInfo {
-  currentStreak: number
-}
-
 /** Иконка текущей серии дней рядом с профилем. Подтягивается один раз при маунте. */
 function StreakBadge() {
-  const [streak, setStreak] = useState<StreakInfo | null>(null)
+  const summary = useProfileSummary()
 
-  useEffect(() => {
-    let cancelled = false
-    const fetchStreak = async () => {
-      try {
-        const response = await fetch('/api/profile')
-        if (!response.ok) return
-        const result = await response.json()
-        if (!cancelled && result.data) {
-          setStreak({ currentStreak: result.data.stats.currentStreak as number })
-        }
-      } catch {
-        // В хедере ошибка загрузки streak некритична — просто не показываем бейдж.
-      }
-    }
-    void fetchStreak()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (!streak || streak.currentStreak < 1) return null
+  // В хедере ошибка загрузки streak некритична — просто не показываем бейдж.
+  if (!summary || summary.currentStreak < 1) return null
 
   return (
     <span
       className="flex items-center gap-1 text-sm text-warning font-medium"
-      title={`Серия изучения: ${streak.currentStreak} дн.`}
+      title={`Серия изучения: ${summary.currentStreak} дн.`}
     >
       <Flame className="w-4 h-4" />
-      {streak.currentStreak}
+      {summary.currentStreak}
     </span>
+  )
+}
+
+/** Аватар из профиля (выбранный → GitHub → инициалы). */
+function HeaderAvatar({ fallbackName }: { fallbackName?: string | null | undefined }) {
+  const summary = useProfileSummary()
+  const src = summary?.avatarUrl ?? summary?.image ?? null
+  const name = summary?.name ?? fallbackName
+
+  if (!src) {
+    return (
+      <span className="w-8 h-8 rounded-full bg-primary/20 border border-border flex items-center justify-center text-sm font-bold text-foreground">
+        {(name ?? '?').charAt(0).toUpperCase()}
+      </span>
+    )
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={name || 'User'}
+      width={32}
+      height={32}
+      className="w-8 h-8 rounded-full"
+      unoptimized={(summary?.avatarUrl ?? src).endsWith('.svg')}
+    />
   )
 }
 
@@ -100,14 +104,8 @@ export function Header() {
                     aria-label={session.user.name ? `Профиль: ${session.user.name}` : 'Профиль'}
                     className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    {session.user.image ? (
-                      <Image
-                        src={session.user.image}
-                        alt={session.user.name || 'User'}
-                        width={32}
-                        height={32}
-                        className="w-8 h-8 rounded-full"
-                      />
+                    {session.user.image || session.user.name ? (
+                      <HeaderAvatar fallbackName={session.user.name} />
                     ) : (
                       <span className="text-sm text-text-secondary hover:text-foreground transition-colors">Профиль</span>
                     )}

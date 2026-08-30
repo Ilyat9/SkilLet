@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
         select: {
           name: true,
           image: true,
+          avatarUrl: true,
           email: true,
           currentStreak: true,
           longestStreak: true,

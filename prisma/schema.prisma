@@ -12,6 +12,8 @@ model User {
   name         String?
   email        String?  @unique
   image        String?
+  // Аватар, выбранный пользователем в профиле (DiceBear/ GitHub); null — фото GitHub из image.
+  avatarUrl    String?
   githubId     String?  @unique
   emailVerified DateTime?
   createdAt DateTime @default(now())

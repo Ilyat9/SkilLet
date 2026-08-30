@@ -12,6 +12,7 @@ interface ProfileApiResponse {
   user: {
     name: string | null
     image: string | null
+    avatarUrl: string | null
     email: string | null
     currentStreak: number
     longestStreak: number
@@ -38,6 +39,28 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileApiResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Выбранный аватар (null — фото GitHub). Оптимистично меняем на клиенте.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isAvatarSaving, setIsAvatarSaving] = useState(false)
+
+  const applyAvatar = async (next: string | null) => {
+    if (isAvatarSaving) return
+    setIsAvatarSaving(true)
+    const previous = avatarUrl
+    setAvatarUrl(next) // оптимистично
+    try {
+      const response = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: next }),
+      })
+      if (!response.ok) throw new Error('save failed')
+    } catch {
+      setAvatarUrl(previous) // откат при ошибке
+    } finally {
+      setIsAvatarSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -57,6 +80,7 @@ export default function ProfilePage() {
           return
         }
         setProfile(result.data as ProfileApiResponse)
+        setAvatarUrl((result.data as ProfileApiResponse).user.avatarUrl ?? null)
       } catch (err) {
         console.error('Ошибка загрузки профиля:', err)
         setError('Не удалось загрузить профиль')
@@ -111,6 +135,22 @@ export default function ProfilePage() {
   const unlockedCodes = new Set(profile.achievements.map((a) => a.code))
   const isUnlocked = (def: AchievementDef) => unlockedCodes.has(def.code)
 
+  // Эффективный аватар: выбранный в профиле → фото GitHub → инициалы.
+  const effectiveAvatar = avatarUrl ?? profile.user.image
+  // DiceBear — детерминированные генеративные SVG (не нейросеть, бесплатно).
+  // Сид = id пользователя из сессии, поэтому наборы у всех разные, но стабильные.
+  const avatarSeed = encodeURIComponent(profile.user.email ?? profile.user.name ?? 'user')
+  const avatarOptions = [
+    { label: 'Adventurer', url: `https://api.dicebear.com/9.x/adventurer/svg?seed=${avatarSeed}` },
+    { label: 'Lorelei', url: `https://api.dicebear.com/9.x/lorelei/svg?seed=${avatarSeed}` },
+    { label: 'Bottts', url: `https://api.dicebear.com/9.x/bottts/svg?seed=${avatarSeed}` },
+    { label: 'Fun Emoji', url: `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${avatarSeed}` },
+    { label: 'Thumbs', url: `https://api.dicebear.com/9.x/thumbs/svg?seed=${avatarSeed}` },
+    { label: 'Инициалы', url: `https://api.dicebear.com/9.x/initials/svg?seed=${avatarSeed}` },
+    { label: 'Идентикон', url: `https://api.dicebear.com/9.x/identicon/svg?seed=${avatarSeed}` },
+    { label: 'Pixel Art', url: `https://api.dicebear.com/9.x/pixel-art/svg?seed=${avatarSeed}` },
+  ]
+
   const statCards = [
     { icon: CheckCircle2, label: 'Пройдено узлов', value: profile.stats.completedNodes },
     { icon: TreePine, label: 'Создано деревьев', value: profile.stats.createdTrees },
@@ -123,8 +163,15 @@ export default function ProfilePage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Шапка профиля */}
         <div className="flex items-center gap-4">
-          {profile.user.image ? (
-            <Image src={profile.user.image} alt={profile.user.name ?? 'User'} width={64} height={64} className="w-16 h-16 rounded-full" />
+          {effectiveAvatar ? (
+            <Image
+              src={effectiveAvatar}
+              alt={profile.user.name ?? 'User'}
+              width={64}
+              height={64}
+              className="w-16 h-16 rounded-full"
+              unoptimized={effectiveAvatar.endsWith('.svg')}
+            />
           ) : (
             <div className="w-16 h-16 rounded-full bg-card border border-border flex items-center justify-center text-2xl font-bold">
               {(profile.user.name ?? '?').charAt(0)}
@@ -135,6 +182,42 @@ export default function ProfilePage() {
             {profile.user.email && <p className="text-muted-foreground text-sm">{profile.user.email}</p>}
           </div>
         </div>
+
+        {/* Выбор аватара: генеративные наборы DiceBear (бесплатные, не нейросеть) + фото GitHub */}
+        <section aria-label="Выбор аватара">
+          <h2 className="text-sm font-semibold text-muted-foreground mb-3">Аватар</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            {avatarOptions.map((option) => (
+              <button
+                key={option.label}
+                onClick={() => void applyAvatar(option.url)}
+                disabled={isAvatarSaving}
+                title={option.label}
+                aria-label={`Выбрать аватар «${option.label}»`}
+                aria-pressed={avatarUrl === option.url}
+                className={`rounded-full overflow-hidden border-2 transition-colors ${
+                  avatarUrl === option.url ? 'border-primary' : 'border-transparent hover:border-border'
+                } disabled:opacity-50`}
+              >
+                <Image src={option.url} alt="" width={48} height={48} className="w-12 h-12" unoptimized />
+              </button>
+            ))}
+            {profile.user.image && (
+              <button
+                onClick={() => void applyAvatar(null)}
+                disabled={isAvatarSaving}
+                title="Фото GitHub"
+                aria-label="Вернуть фото GitHub"
+                aria-pressed={avatarUrl === null}
+                className={`rounded-full overflow-hidden border-2 transition-colors ${
+                  avatarUrl === null ? 'border-primary' : 'border-transparent hover:border-border'
+                } disabled:opacity-50`}
+              >
+                <Image src={profile.user.image} alt="" width={48} height={48} className="w-12 h-12" />
+              </button>
+            )}
+          </div>
+        </section>
 
         {/* Статистика */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -156,6 +239,9 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {ACHIEVEMENT_DEFS.map((def) => {
               const unlocked = isUnlocked(def)
+              // Несекретные видны целиком; секретные до разблокировки прячут
+              // содержание — виден только намёк, что достижение существует.
+              const isHiddenSecret = Boolean(def.secret) && !unlocked
               return (
                 <div
                   key={def.code}
@@ -166,15 +252,17 @@ export default function ProfilePage() {
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <span className="text-2xl" aria-hidden>{def.icon}</span>
+                    <span className="text-2xl" aria-hidden>{isHiddenSecret ? '🎁' : def.icon}</span>
                     {unlocked ? (
                       <Badge variant="success">Получено</Badge>
                     ) : (
-                      <Badge variant="default">Заблокировано</Badge>
+                      <Badge variant="default">{isHiddenSecret ? 'Секретное' : 'Заблокировано'}</Badge>
                     )}
                   </div>
-                  <h3 className="font-semibold mt-2">{def.title}</h3>
-                  <p className="text-sm text-muted-foreground">{def.description}</p>
+                  <h3 className="font-semibold mt-2">{isHiddenSecret ? 'Секретное достижение' : def.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {isHiddenSecret ? 'Получите его, чтобы узнать, что за ним скрывается' : def.description}
+                  </p>
                 </div>
               )
             })}

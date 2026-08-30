@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -12,6 +12,7 @@ import {
   type Connection,
 } from '@xyflow/react'
 import { useTreeEditor, type EditorNode, type EditorEdge } from '@/features/tree-builder/model/useTreeEditor'
+import { EditorNodeView } from './EditorNodeView'
 import { Button } from '@/shared/ui/Button'
 import { Badge } from '@/shared/ui/Badge'
 import { Modal } from '@/shared/ui/Modal'
@@ -160,11 +161,20 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
   const isInputClass =
     'w-full bg-background border border-border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary'
 
+  // Все узлы редактора рендерятся кастомной карточкой (EditorNodeView):
+  // без явного nodeTypes ReactFlow рисует дефолтные белые прямоугольники.
+  const nodeTypes = useMemo(() => ({ editor: EditorNodeView }), [])
+  const styledNodes = useMemo(
+    () => editor.nodes.map((n) => (n.type === 'editor' ? n : ({ ...n, type: 'editor' } as EditorNode))),
+    [editor.nodes]
+  )
+
   return (
     <div className="relative w-full h-full">
       <ReactFlow
-        nodes={editor.nodes}
+        nodes={styledNodes}
         edges={editor.edges}
+        nodeTypes={nodeTypes}
         onNodesChange={editor.onNodesChange}
         onEdgesChange={editor.onEdgesChange}
         onConnect={handleConnect}
