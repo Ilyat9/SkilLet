@@ -25,7 +25,7 @@
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
 
-  /* Акцент (янтарный): заливка бейджей/тостов, рамки доступных узлов. */
+  /* Акцент (киноварь): заливка бейджей/тостов, рамки доступных узлов. */
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
   /* Более тёмный оттенок акцента для текста/иконок поверх фона страницы. */
@@ -43,73 +43,100 @@
   --color-text-secondary: hsl(var(--text-secondary));
   --color-text-tertiary: hsl(var(--text-tertiary));
 
+  /* Второй акцент — железо-галловые чернила (приглушённый индиго).
+     Исторический цвет чернил манускриптов; второстепенные пометки,
+     подписи на полях, нейтральные ссылки. */
+  --color-ink: hsl(var(--ink));
+  --color-ink-strong: hsl(var(--ink-strong));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 }
 
-/* ---------- Светлая тема (по умолчанию) ---------- */
+/*
+ * ---------- Светлая тема: состаренный пергамент ----------
+ * Основа — тёплый кремово-серый (никогда не чистый белый), текст — тёмные
+ * чернила, акцент — киноварь: красно-оранжевый пигмент, которым в реальных
+ * средневековых манускриптах писали заглавные буквы и важные пометки.
+ * Не золото-на-чёрном: это сознательный уход от самого узнаваемого клише
+ * «dark fantasy»-тем (см. docs/design-identity.md, часть 1.1).
+ */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --primary: 142 72% 29%;            /* белый текст на primary: 4.86:1 */
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 94%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --border: 214.3 31.8% 87%;
+  --background: 35 22% 88%;          /* пергамент */
+  --foreground: 28 20% 14%;          /* тёмные чернила */
 
-  --muted: 210 40% 95%;
-  --muted-foreground: 215.3 19% 35%; /* 7.58:1 на белом */
+  --primary: 8 65% 42%;              /* киноварь; белый текст на ней: ~4.9:1 */
+  --primary-foreground: 35 30% 95%;
+  --secondary: 33 16% 82%;           /* чуть темнее пергамента */
+  --secondary-foreground: 28 20% 15%;
+  --card: 36 28% 93%;                /* лист чуть светлее фона-стола */
+  --card-foreground: 28 20% 14%;
+  --border: 30 14% 70%;              /* тёплая серо-коричневая линейка */
 
-  --accent: 43 100% 45%;             /* бейджи: navy-текст 6.74:1 */
-  --accent-foreground: 224 50% 12%;
-  --accent-strong: 28 90% 30%;       /* текст/иконки акцента: 5.5:1 на белом */
+  --muted: 34 18% 84%;
+  --muted-foreground: 27 12% 34%;    /* ~7.4:1 на пергаменте */
 
-  --destructive: 0 72% 51%;          /* белый текст: 4.83:1 */
+  --accent: 8 60% 44%;               /* бейджи: пергаментный текст ~4.6:1 */
+  --accent-foreground: 35 30% 95%;
+  --accent-strong: 8 70% 30%;        /* текст/иконки акцента: ~6:1 на фоне */
+
+  /* Железо-галловые чернила: второстепенные статусы и пометки на полях. */
+  --ink: 220 32% 26%;                /* ~7.6:1 на фоне */
+  --ink-strong: 220 38% 20%;
+
+  --destructive: 0 62% 40%;          /* запекшаяся кровь, не алый; белый текст ~5:1 */
   --destructive-foreground: 0 0% 100%;
-  --success: 142 72% 29%;            /* белый текст: 4.86:1 */
-  --success-foreground: 210 40% 98%;
-  --warning: 43 96% 50%;             /* коричнево-чёрный текст: 6.9:1 */
-  --warning-foreground: 40 82% 7%;
+  --success: 150 28% 30%;            /* приглушённый травяной; белый текст ~5.5:1 */
+  --success-foreground: 120 30% 95%;
+  --warning: 34 74% 38%;             /* охра; тёмный текст ~5.8:1 */
+  --warning-foreground: 35 40% 95%;
 
-  --text-secondary: 215.3 19% 35%;   /* 7.58:1 на белом */
-  --text-tertiary: 216 16% 42%;      /* 5.5:1 на белом */
+  --text-secondary: 28 14% 33%;      /* ~7.4:1 на фоне */
+  --text-tertiary: 27 10% 42%;       /* ~5.3:1 на фоне */
 
-  --radius: 0.5rem;
+  --radius: 0.375rem;
 }
 
-/* ---------- Тёмная тема ---------- */
+/*
+ * ---------- Тёмная тема: дублёная кожа обложки ----------
+ * Не чёрный: цвет старого дерева/кожи переплёта. Киноварь светлеет до
+ * читаемого на тёмном оттенка, чернильный индиго выцветает как на старой
+ * бумаге, лежавшей при свече.
+ */
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --primary: 142 70% 30%;            /* белый текст: 4.67:1 */
-  --primary-foreground: 210 40% 98%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --card: 222.2 47% 7%;
-  --card-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 18%;
+  --background: 25 18% 12%;
+  --foreground: 35 25% 87%;
 
-  --muted: 217.2 32.6% 14%;
-  --muted-foreground: 215 20% 74%;   /* 8+:1 на фоне */
+  --primary: 8 55% 42%;              /* киноварь на коже; светлый текст ~4.8:1 */
+  --primary-foreground: 30 35% 93%;
+  --secondary: 25 14% 18%;
+  --secondary-foreground: 35 25% 87%;
+  --card: 25 16% 16%;
+  --card-foreground: 35 25% 87%;
+  --border: 25 12% 26%;
 
-  --accent: 43 96% 56%;              /* бейджи: navy-текст 8.64:1 */
-  --accent-foreground: 224 50% 12%;
-  --accent-strong: 43 96% 62%;       /* 12+:1 на тёмном фоне */
+  --muted: 25 14% 19%;
+  --muted-foreground: 32 14% 70%;    /* 8+:1 на фоне */
 
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
-  --success: 141 78% 55%;            /* тёмно-зелёный текст: 6.5:1 */
-  --success-foreground: 152 76% 8%;
-  --warning: 43 96% 56%;
-  --warning-foreground: 40 82% 7%;
+  --accent: 12 60% 58%;              /* бейджи: почти чёрный текст ~5:1 */
+  --accent-foreground: 20 30% 8%;
+  --accent-strong: 14 65% 62%;       /* текст/иконки: ~5.2:1 на фоне */
 
-  --text-secondary: 213 27% 65%;     /* slate-400: 7.8:1 на фоне */
-  --text-tertiary: 218 16% 56%;      /* 5.7:1 на фоне */
+  --ink: 220 30% 72%;
+  --ink-strong: 220 32% 80%;
 
-  --radius: 0.5rem;
+  --destructive: 2 60% 52%;
+  --destructive-foreground: 0 0% 98%;
+  --success: 145 32% 52%;            /* тёмно-зелёный текст: ~6.3:1 */
+  --success-foreground: 152 40% 8%;
+  --warning: 36 70% 58%;
+  --warning-foreground: 30 40% 8%;
+
+  --text-secondary: 30 12% 68%;      /* ~7.5:1 на фоне */
+  --text-tertiary: 28 10% 58%;       /* ~5.5:1 на фоне */
+
+  --radius: 0.375rem;
 }
 
 @layer base {
@@ -197,33 +224,57 @@
   }
 }
 
+@layer base {
+  /* Заголовки — гуманистическая антиква переписчика (EB Garamond, есть
+     кириллица). Основной текст остаётся гротескным: читаемость длинных
+     описаний узлов важнее стиля. */
+  h1, h2, h3, h4 {
+    font-family: var(--font-display), var(--font-geist-sans), Georgia, serif;
+    font-weight: 600;
+  }
+
+  /* Числовые метки (сложность узлов, счётчики) — типографская литера. */
+  .font-stamp {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.9em;
+    letter-spacing: 0.02em;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 
+  /*
+   * Тайминги появления — намеренно НЕ дефолтные: вход быстрее выхода,
+   * кривые асимметричные. Единый `300ms ease` здесь был бы характерным
+   * следом конвейерной генерации.
+   */
+
   /* Появление тостов (slide-in справа). */
   .animate-toast-in {
-    animation: skillet-toast-in 0.2s ease-out;
+    animation: skillet-toast-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* Открытие модалки (fade + scale). */
+  /* Открытие модалки: сама модалка выскакивает быстро… */
   .animate-modal-in {
-    animation: skillet-modal-in 0.18s ease-out;
+    animation: skillet-modal-in 0.16s cubic-bezier(0.2, 0.9, 0.25, 1);
   }
 
+  /* …а подложка под ней гаснет дольше — слои движутся вразнобой. */
   .animate-overlay-in {
-    animation: skillet-overlay-in 0.15s ease-out;
+    animation: skillet-overlay-in 0.22s cubic-bezier(0.33, 0, 0.2, 1);
   }
 
   /* Выезд bottom-sheet drawer'а. */
   .animate-sheet-up {
-    animation: skillet-sheet-up 0.22s ease-out;
+    animation: skillet-sheet-up 0.26s cubic-bezier(0.18, 0.9, 0.24, 1);
   }
 
   /* Разовое заметное «спульсирующее» появление разблокированного достижения. */
   .animate-achievement-pulse {
-    animation: skillet-achievement-pulse 0.7s ease-out;
+    animation: skillet-achievement-pulse 0.62s cubic-bezier(0.34, 1.3, 0.64, 1);
   }
 }
 
