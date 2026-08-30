@@ -40,7 +40,7 @@ export function Logo({ className }: { className?: string }) {
         x="16"
         y="22.5"
         textAnchor="middle"
-        fontFamily="var(--font-display), Georgia, serif"
+        fontFamily="var(--font-geist-sans), sans-serif"
         fontWeight="600"
         fontSize="17"
         fill="hsl(var(--accent-strong))"

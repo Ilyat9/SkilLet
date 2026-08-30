@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, EB_Garamond } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import Providers from "./providers"
 import { ConditionalHeader } from "@/widgets/Header"
@@ -14,14 +14,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin", "cyrillic"],
-})
-
-/* Заголовочная антиква переписчика. EB Garamond, а не Spectral/Cinzel:
-   у Spectral нет кириллицы (а интерфейс русский), Cinzel — уже клише. */
-const displaySerif = EB_Garamond({
-  variable: "--font-display",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
 })
 
 export const metadata: Metadata = {
@@ -63,7 +55,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${displaySerif.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         <Providers>
           <ConditionalHeader />
