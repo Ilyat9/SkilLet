@@ -30,6 +30,7 @@ import {
   GitFork,
   Download,
   Lock,
+  Globe,
   CheckCircle2,
   Circle,
   Info,
@@ -105,6 +106,8 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
   const [likes, setLikes] = useState(0)
   const [isLikeBusy, setIsLikeBusy] = useState(false)
   const [isForking, setIsForking] = useState(false)
+  // Смена публичности дерева (только владелец): PATCH /api/trees/[id].
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false)
 
   const handleDeleteTree = async () => {
     setIsDeletingTree(true)
@@ -229,6 +232,33 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       }
       return next
     })
+  }
+
+  /** Переключение публичности дерева (только владелец): оптимистично + rollback. */
+  const handleToggleVisibility = async () => {
+    if (!tree || isTogglingVisibility) return
+    setIsTogglingVisibility(true)
+    const prev = tree.isPublic
+    setTree({ ...tree, isPublic: !prev }) // оптимистично
+    try {
+      const response = await fetch(`/api/trees/${treeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: !prev }),
+      })
+      const result = await response.json()
+      if (result.error) throw new Error(result.error.message)
+      showToast(
+        !prev ? 'Дерево открыто для всех — оно появилось в каталоге' : 'Дерево теперь приватное — видно только вам',
+        'success'
+      )
+    } catch (error) {
+      console.error('Ошибка смены доступа дерева:', error)
+      setTree({ ...tree, isPublic: prev })
+      showToast('Не удалось изменить доступ к дереву', 'error')
+    } finally {
+      setIsTogglingVisibility(false)
+    }
   }
 
   /** Оптимистичный тоггл лайка дерева (с rollback при ошибке). */
@@ -598,6 +628,8 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       onFork={() => void handleFork()}
       isForking={isForking}
       onExport={handleExport}
+      onToggleVisibility={() => void handleToggleVisibility()}
+      isTogglingVisibility={isTogglingVisibility}
     >
       {/* Содержимое основной области */}
       {!isEditMode && totalNodes === 0 ? (
@@ -682,6 +714,9 @@ interface TreePageLayoutProps {
   onFork: () => void
   isForking: boolean
   onExport: () => void
+  /** Переключение публичности (только владелец): открыть всем / сделать приватным. */
+  onToggleVisibility: () => void
+  isTogglingVisibility: boolean
 }
 
 function TreePageLayout({
@@ -706,6 +741,8 @@ function TreePageLayout({
   onFork,
   isForking,
   onExport,
+  onToggleVisibility,
+  isTogglingVisibility,
 }: TreePageLayoutProps) {
   return (
     <div className="h-screen bg-background flex flex-col">
@@ -759,6 +796,28 @@ function TreePageLayout({
             )}
             {isOwner && (
               <>
+                {/* Публичность дерева: открыть всем (появится в каталоге) / сделать приватным. */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onToggleVisibility}
+                  disabled={isTogglingVisibility}
+                  title={
+                    tree.isPublic
+                      ? 'Сделать приватным — дерево будет видно только вам'
+                      : 'Открыть доступ — дерево появится в каталоге'
+                  }
+                  aria-label={tree.isPublic ? 'Сделать дерево приватным' : 'Сделать дерево публичным'}
+                >
+                  {tree.isPublic ? (
+                    <Lock className="w-4 h-4 mr-1" aria-hidden />
+                  ) : (
+                    <Globe className="w-4 h-4 mr-1 text-success" aria-hidden />
+                  )}
+                  <span className="hidden sm:inline">
+                    {tree.isPublic ? 'Сделать приватным' : 'Открыть доступ'}
+                  </span>
+                </Button>
                 <Button size="sm" variant={isEditMode ? 'secondary' : 'ghost'} onClick={() => setIsEditMode(!isEditMode)}>
                   <PencilLine className="w-4 h-4 mr-1" />
                   <span className="hidden sm:inline">{isEditMode ? 'Закрыть редактор' : 'Редактор'}</span>
