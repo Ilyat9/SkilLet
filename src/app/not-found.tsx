@@ -10,7 +10,7 @@ export default function NotFound() {
           <Compass className="w-8 h-8 text-text-tertiary" aria-hidden />
         </div>
         <p className="text-sm font-semibold text-primary mb-1">404</p>
-        <h1 className="text-2xl font-bold mb-2">Страница не найдена</h1>
+        <h1 className="text-2xl font-bold mb-2">Такой страницы на карте нет</h1>
         <p className="text-muted-foreground mb-6">
           Возможно, страница была удалена или её адрес указан неверно.
         </p>

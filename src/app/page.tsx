@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/shared/ui/Button'
+import { Logo } from '@/shared/ui/Logo'
 
 export default function Home() {
   return (
@@ -7,47 +8,49 @@ export default function Home() {
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div className="text-center max-w-3xl">
           <div className="inline-block mb-6">
-            <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-primary to-success bg-clip-text text-transparent">
-              SkilLet
-            </h1>
+            <Logo className="h-12 w-12 mx-auto mb-4" />
+            <h1 className="text-6xl mb-4">SkilLet</h1>
             <p className="text-xl text-muted-foreground">
-              Интерактивная платформа для обучения в формате RPG skill-tree
+              Деревья навыков: планируйте обучение и отмечайте пройденное
             </p>
           </div>
 
           <p className="text-text-tertiary mb-8 text-lg">
-            Превратите обучение в увлекательную игру.
-            Отмечайте навыки как пройденные, создавайте свои деревья и достигайте новых высот!
+            Постройте маршрут из навыков, где следующий открывается после
+            предыдущего. Начните с готового дерева из каталога или нарисуйте своё.
           </p>
 
           <div className="flex items-center justify-center gap-4 mb-12">
             <Button size="lg" asChild>
-              <Link href="/tree/new">Начать обучение</Link>
+              <Link href="/tree/new">Создать дерево</Link>
             </Button>
             <Button size="lg" variant="secondary" asChild>
-              <Link href="/dashboard">Посмотреть деревья</Link>
+              <Link href="/explore">Открыть каталог</Link>
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            <div className="bg-card border border-border rounded-lg p-6 hover:border-primary transition-colors">
-              <h3 className="text-lg font-semibold mb-2">🎮 RPG система</h3>
+          <div className="text-left max-w-xl mx-auto divide-y divide-border">
+            <div className="py-5">
+              <h3 className="text-lg font-semibold mb-1">Зависимости вместо галочек</h3>
               <p className="text-muted-foreground text-sm">
-                Отмечайте навыки как пройденные и прокачивайте свои деревья в формате RPG
+                Узлы связаны между собой: пока основа не пройдена, продолжение остаётся
+                недоступным. Прогресс виден на графе целиком.
               </p>
             </div>
 
-            <div className="bg-card border border-border rounded-lg p-6 hover:border-primary transition-colors">
-              <h3 className="text-lg font-semibold mb-2">🌳 Skill Trees</h3>
+            <div className="py-5">
+              <h3 className="text-lg font-semibold mb-1">Каталог сообщества</h3>
               <p className="text-muted-foreground text-sm">
-                Создавайте собственные деревья навыков или используйте готовые от сообщества
+                Готовые деревья по frontend, backend, design и другим разделам.
+                Любое публичное дерево можно форкнуть и переделать под себя.
               </p>
             </div>
 
-            <div className="bg-card border border-border rounded-lg p-6 hover:border-primary transition-colors">
-              <h3 className="text-lg font-semibold mb-2">📱 Современный UI</h3>
+            <div className="py-5">
+              <h3 className="text-lg font-semibold mb-1">Серия дней и достижения</h3>
               <p className="text-muted-foreground text-sm">
-                Адаптивный дизайн на Tailwind CSS с тёмной темой по умолчанию
+                Streak растёт, пока вы отмечаете узлы хотя бы раз в день; за вехи
+                выдаются достижения.
               </p>
             </div>
           </div>

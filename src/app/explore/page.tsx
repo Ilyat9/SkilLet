@@ -263,7 +263,7 @@ export default function ExplorePage() {
           ) : (
             <EmptyState
               icon={Compass}
-              title="Пока нет публичных деревьев"
+              title="Карта пока пуста"
               description="Создайте первое дерево и поделитесь им с сообществом"
               action={<Button onClick={() => router.push('/tree/new')}>Создать дерево</Button>}
             />
