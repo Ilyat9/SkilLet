@@ -3,7 +3,7 @@
 import { X, BookOpen } from 'lucide-react'
 import { MarkCompleteButton } from '@/features/progress-tracker/ui/MarkCompleteButton'
 import type { Node as AppNode } from '@/entities/node/model/types'
-import type { NodeStatus } from '@/shared/constants'
+import { NODE_STATUS, type NodeStatus } from '@/shared/constants'
 
 /**
  * Карточка выбранного навыка в правом сайдбаре: описание, материалы,
@@ -22,6 +22,7 @@ export interface NodeDetailsCardProps {
 
 export function NodeDetailsCard({
   node,
+  status,
   completedNodeIds,
   isCompleted,
   blockedByTitle,
@@ -29,6 +30,9 @@ export function NodeDetailsCard({
   onToggle,
   onClose,
 }: NodeDetailsCardProps) {
+  // Заблокированный навык: ни описания, ни материалов — только название,
+  // сложность и подсказка, что откроет его.
+  const isLocked = status === NODE_STATUS.LOCKED
   return (
     <div className="bg-card border-2 border-primary rounded-lg shadow-lg p-4">
       <div className="flex items-start justify-between gap-2">
@@ -44,9 +48,12 @@ export function NodeDetailsCard({
 
       <div className="text-xs text-muted-foreground mt-1">Сложность: {node.difficulty}/10</div>
 
-      {node.description && <p className="text-xs text-muted-foreground mt-2">{node.description}</p>}
+      {!isLocked && node.description && (
+        <p className="text-xs text-muted-foreground mt-2">{node.description}</p>
+      )}
 
-      {node.resources.length > 0 ? (
+      {!isLocked &&
+        (node.resources.length > 0 ? (
         <div className="mt-3">
           <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground mb-1.5">
             <BookOpen className="w-3.5 h-3.5" aria-hidden />
@@ -69,7 +76,7 @@ export function NodeDetailsCard({
         </div>
       ) : (
         <p className="text-xs text-muted-foreground mt-3">Материалы к навыку пока не добавлены.</p>
-      )}
+      ))}
 
       <div className="mt-3">
         <MarkCompleteButton

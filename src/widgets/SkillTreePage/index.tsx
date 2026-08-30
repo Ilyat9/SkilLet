@@ -502,6 +502,28 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
                     const isSelected = node.id === selectedNodeId
                     const isLocked = getNodeStatus(node, completedNodeIds) === NODE_STATUS.LOCKED
                     const blocker = isLocked ? blockedByTitle(node) : null
+                    // Заблокированный навык — не кнопка: никаких деталей,
+                    // описания и материалов, пока не открыты пререквизиты.
+                    if (isLocked) {
+                      return (
+                        <li key={node.id} data-node-id={node.id}>
+                          <div
+                            aria-disabled="true"
+                            className="w-full px-2 py-1.5 rounded-md flex items-start gap-2 opacity-70 cursor-default"
+                          >
+                            <Lock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+                            <span className="min-w-0">
+                              <span className="block text-sm leading-snug">{node.title}</span>
+                              {blocker && (
+                                <span className="block text-xs text-muted-foreground">
+                                  после «{blocker}»
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </li>
+                      )
+                    }
                     return (
                       <li key={node.id} data-node-id={node.id}>
                         <button
@@ -514,18 +536,11 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
                         >
                           {completedNodeIds.has(node.id) ? (
                             <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" aria-hidden />
-                          ) : isLocked ? (
-                            <Lock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
                           ) : (
                             <Circle className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
                           )}
                           <span className="min-w-0">
                             <span className="block text-sm leading-snug">{node.title}</span>
-                            {blocker && (
-                              <span className="block text-xs text-muted-foreground">
-                                после «{blocker}»
-                              </span>
-                            )}
                           </span>
                         </button>
                         {/* Карточка навыка раскрывается прямо под выбранным пунктом. */}
