@@ -68,10 +68,10 @@ export const NODE_POSITION_LIMIT = 3000
 export const TREE_CATEGORIES = [
   'FRONTEND',
   'BACKEND',
-  'DEVOPS',
   'DATA_SCIENCE',
   'SOFT_SKILLS',
   'DESIGN',
+  'LANGUAGES',
   'OTHER',
 ] as const
 

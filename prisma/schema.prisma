@@ -76,10 +76,10 @@ model Tree {
 enum TreeCategory {
   FRONTEND
   BACKEND
-  DEVOPS
   DATA_SCIENCE
   SOFT_SKILLS
   DESIGN
+  LANGUAGES
   OTHER
 }
 

@@ -33,7 +33,7 @@ type TreeSeed = {
   title: string
   description: string
   isPublic: boolean
-  category: 'FRONTEND' | 'BACKEND' | 'DEVOPS' | 'DATA_SCIENCE' | 'SOFT_SKILLS' | 'DESIGN' | 'OTHER'
+  category: 'FRONTEND' | 'BACKEND' | 'DATA_SCIENCE' | 'SOFT_SKILLS' | 'DESIGN' | 'LANGUAGES' | 'OTHER'
   nodes: NodeData[]
   /** Пары индексов [sourceIndex, targetIndex] по массиву nodes. */
   connections: EdgePair[]
