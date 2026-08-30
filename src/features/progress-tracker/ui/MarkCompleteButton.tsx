@@ -15,6 +15,8 @@ interface MarkCompleteButtonProps {
   node: Node
   completedNodeIds: Set<string>
   isCompleted: boolean
+  /** Заголовок навыка-пререквизита, из-за которого узел заблокирован (для подсказки). */
+  blockedByTitle?: string | null
   onToggle: (completed: boolean) => void
 }
 
@@ -24,7 +26,13 @@ interface ProgressApiResponse {
   unlockedAchievements: Achievement[]
 }
 
-export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onToggle }: MarkCompleteButtonProps) {
+export function MarkCompleteButton({
+  node,
+  completedNodeIds,
+  isCompleted,
+  blockedByTitle = null,
+  onToggle,
+}: MarkCompleteButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isFailed, setIsFailed] = useState(false)
   const { data: session } = useAuth()
@@ -84,10 +92,17 @@ export function MarkCompleteButton({ node, completedNodeIds, isCompleted, onTogg
 
   if (status === NODE_STATUS.LOCKED) {
     return (
-      <Badge variant="default" className="flex items-center gap-2">
-        <Lock className="w-3 h-3" />
-        Заблокировано
-      </Badge>
+      <div>
+        <Badge variant="default" className="flex items-center gap-2 w-full justify-center">
+          <Lock className="w-3 h-3" />
+          Заблокировано
+        </Badge>
+        {blockedByTitle && (
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Сначала пройдите «{blockedByTitle}»
+          </p>
+        )}
+      </div>
     )
   }
 

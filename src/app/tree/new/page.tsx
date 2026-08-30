@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/shared/ui/Button'
@@ -11,11 +11,20 @@ import { TreeExportSchema } from '@/entities/tree/model/schemas'
 import { cn } from '@/shared/lib/utils'
 import { Loader2, ArrowLeft, Sparkles, FileUp, FileWarning } from 'lucide-react'
 
-type CreateMode = 'templates' | 'ai' | 'import'
+type CreateMode = 'ai' | 'templates' | 'import'
+
+// Пошаговый статус генерации: каждая смена шага — ~6 сек, чтобы ожидание
+// 10–30 сек выглядело живым процессом, а не зависшим спиннером.
+const GENERATION_STEPS = [
+  'Формулирую план обучения…',
+  'Генерирую навыки и связи…',
+  'Подбираю материалы…',
+  'Собираю дерево…',
+] as const
 
 export default function NewTreePage() {
   const router = useRouter()
-  const [mode, setMode] = useState<CreateMode>('templates')
+  const [mode, setMode] = useState<CreateMode>('ai')
   // Категория: разумный дефолт OTHER, пользователь может выбрать осмысленную
   // до создания (пустое дерево, AI); шаблоны несут категорию по умолчанию.
   const [category, setCategory] = useState<TreeCategoryValue>('OTHER')
@@ -32,7 +41,18 @@ export default function NewTreePage() {
   // Состояние AI-генерации
   const [topic, setTopic] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [genStep, setGenStep] = useState(0)
   const [aiError, setAiError] = useState<string | null>(null)
+
+  // Таймер шагов генерации: пока идёт генерация, статус сменяется каждые 6 сек.
+  useEffect(() => {
+    if (!isGenerating) return
+    setGenStep(0)
+    const timer = window.setInterval(() => {
+      setGenStep((prev) => Math.min(prev + 1, GENERATION_STEPS.length - 1))
+    }, 6000)
+    return () => window.clearInterval(timer)
+  }, [isGenerating])
 
   // Состояние импорта из файла
   const [isImporting, setIsImporting] = useState(false)
@@ -201,12 +221,12 @@ export default function NewTreePage() {
             </p>
           </div>
 
-          {/* Вкладки способа создания */}
+          {/* Вкладки способа создания: AI — первая, это главная фича страницы. */}
           <div className="grid grid-cols-3 gap-2 p-1 bg-secondary rounded-lg mb-6" role="tablist">
             {(
               [
-                { id: 'templates', label: 'Шаблоны' },
                 { id: 'ai', label: 'AI-генерация' },
+                { id: 'templates', label: 'Шаблоны' },
                 { id: 'import', label: 'Импорт' },
               ] as const
             ).map((tab) => (
@@ -254,13 +274,8 @@ export default function NewTreePage() {
             </div>
           )}
 
-          {/* Панель «создать пустое дерево» — доступна из обеих вкладок */}
+          {/* Содержимое вкладок (без гигантской «пустой» кнопки — она ссылка внизу) */}
           <div className="space-y-3">
-            <Button onClick={handleCreateEmpty} disabled={isCreatingEmpty} className="w-full" size="lg">
-              {isCreatingEmpty ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
-              Создать пустое дерево
-            </Button>
-
             {mode === 'templates' ? (
               <Button
                 onClick={() => setIsTemplateModalOpen(true)}
@@ -337,7 +352,7 @@ export default function NewTreePage() {
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Генерируем дерево (до ~30 сек)…
+                      Генерируем дерево…
                     </>
                   ) : (
                     <>
@@ -347,8 +362,38 @@ export default function NewTreePage() {
                   )}
                 </Button>
                 {isGenerating && (
+                  <ul className="space-y-1.5 pt-1" aria-live="polite">
+                    {GENERATION_STEPS.map((step, index) => (
+                      <li
+                        key={step}
+                        className={cn(
+                          'flex items-center gap-2 text-sm transition-opacity',
+                          index < genStep
+                            ? 'text-muted-foreground'
+                            : index === genStep
+                              ? 'text-foreground'
+                              : 'opacity-40'
+                        )}
+                      >
+                        {index < genStep ? (
+                          <span className="text-success" aria-hidden>✓</span>
+                        ) : index === genStep ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" aria-hidden />
+                        ) : (
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-border shrink-0 inline-block"
+                            aria-hidden
+                          />
+                        )}
+                        {step}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!isGenerating && (
                   <p className="text-xs text-text-tertiary text-center">
                     Модель придумает 8–20 узлов со связями и ресурсами — останется только учиться.
+                    Обычно занимает 10–30 секунд.
                   </p>
                 )}
               </div>
@@ -360,6 +405,17 @@ export default function NewTreePage() {
               <p className="text-destructive text-sm">{emptyError ?? aiError}</p>
             </div>
           )}
+
+          {/* Пустое дерево — вторичный сценарий, поэтому скромная ссылка внизу. */}
+          <div className="mt-6 pt-4 border-t border-border text-center">
+            <button
+              onClick={handleCreateEmpty}
+              disabled={isCreatingEmpty}
+              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50"
+            >
+              {isCreatingEmpty ? 'Создаём…' : 'Или создайте пустое дерево с нуля'}
+            </button>
+          </div>
         </div>
       </div>
 

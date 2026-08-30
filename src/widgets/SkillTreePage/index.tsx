@@ -11,6 +11,7 @@ import { MarkCompleteButton } from '@/features/progress-tracker/ui/MarkCompleteB
 import { Node as PrismaNode, Edge as PrismaEdge, Tree } from '@prisma/client'
 import Link from 'next/link'
 import { parseResources } from '@/entities/node/model/schemas'
+import { cn } from '@/shared/lib/utils'
 import { useToast } from '@/shared/ui/Toast'
 import { Button } from '@/shared/ui/Button'
 import { Modal } from '@/shared/ui/Modal'
@@ -28,7 +29,14 @@ import {
   Heart,
   GitFork,
   Download,
+  Lock,
+  CheckCircle2,
+  Circle,
+  BookOpen,
+  Info,
 } from 'lucide-react'
+import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
+import { NODE_STATUS } from '@/shared/constants'
 
 interface ApiNodeInput extends Omit<PrismaNode, 'resources'> {
   resources: unknown
@@ -83,6 +91,11 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
   const [loadError, setLoadError] = useState<LoadError>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isShareCopied, setIsShareCopied] = useState(false)
+  // Выбранный узел: клик по графу открывает его карточку в сайдбаре
+  // (детали + материалы + отметка прогресса). Сам клик прогресс НЕ меняет.
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  // Онбординг-подсказка «как это работает» — показывается до первого закрытия.
+  const [showHint, setShowHint] = useState(false)
   // Подтверждение удаления дерева: hard-delete каскадно стирает узлы, рёбра
   // и весь прогресс — требуем явного подтверждения с перечислением последствий.
   const [isDeleteTreeConfirmOpen, setIsDeleteTreeConfirmOpen] = useState(false)
@@ -165,54 +178,28 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       return
     }
     void fetchTree()
+    // Показываем онбординг один раз на устройство (до первого закрытия).
+    try {
+      if (!window.localStorage.getItem('skillet-tree-hint-dismissed')) setShowHint(true)
+    } catch {
+      setShowHint(true)
+    }
   }, [status, fetchTree])
 
-  // Оптимистичный toggle с откатом при ошибке сервера.
-  const handleNodeClick = async (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId)
-    if (!node) return
-
-    const isCompleted = completedNodeIds.has(nodeId)
-    setCompletedNodeIds((prev) => {
-      const next = new Set(prev)
-      if (isCompleted) {
-        next.delete(nodeId)
-      } else {
-        next.add(nodeId)
-      }
-      return next
-    })
-
-    // Откат в противоположную сторону от оптимистичного апдейта.
-    const rollback = () => {
-      setCompletedNodeIds((prev) => {
-        const next = new Set(prev)
-        if (isCompleted) {
-          next.add(nodeId)
-        } else {
-          next.delete(nodeId)
-        }
-        return next
-      })
-    }
-
+  const dismissHint = () => {
+    setShowHint(false)
     try {
-      // treeId не передаём в body — сервер берёт его из URL.
-      const response = await fetch(`/api/trees/${treeId}/progress`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, completed: !isCompleted }),
-      })
+      window.localStorage.setItem('skillet-tree-hint-dismissed', '1')
+    } catch {
+      /* приватный режим — просто не запоминаем */
+    }
+  }
 
-      const result = await response.json()
-      if (result.error) {
-        rollback()
-        showToast(result.error.message ?? 'Не удалось обновить прогресс', 'error')
-      }
-    } catch (error) {
-      console.error('Ошибка обновления прогресса:', error)
-      rollback()
-      showToast('Ошибка обновления прогресса', 'error')
+  /** Выбор узла графа: открывает карточку навыка в сайдбаре (на мобильных — drawer). */
+  const handleNodeSelect = (nodeId: string) => {
+    setSelectedNodeId(nodeId)
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
+      setIsSidebarOpen(true)
     }
   }
 
@@ -428,34 +415,192 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
     type: 'smoothstep',
   }))
 
+  /** Заголовок навыка, блокирующего данный (первый непройденный пререквизит). */
+  const blockedByTitle = (node: AppTreeNode): string | null => {
+    for (const edge of node.incomingEdges) {
+      const parent = nodes.find((n) => n.id === edge.sourceId)
+      if (parent && !completedNodeIds.has(parent.id)) return parent.title
+    }
+    return null
+  }
+
+  const selectedNode = selectedNodeId ? (nodes.find((n) => n.id === selectedNodeId) ?? null) : null
+  const selectedStatus = selectedNode ? getNodeStatus(selectedNode, completedNodeIds) : null
+  const unlockCount = selectedNode
+    ? selectedNode.outgoingEdges.filter((e) => {
+        const child = nodes.find((n) => n.id === e.targetId)
+        return child && getNodeStatus(child, completedNodeIds) === NODE_STATUS.LOCKED
+      }).length
+    : 0
+
+  const statusGroups: { key: string; label: string; items: AppTreeNode[] }[] = [
+    {
+      key: 'available',
+      label: 'Доступно сейчас',
+      items: nodes.filter((n) => getNodeStatus(n, completedNodeIds) === NODE_STATUS.AVAILABLE),
+    },
+    {
+      key: 'completed',
+      label: 'Пройдено',
+      items: nodes.filter((n) => completedNodeIds.has(n.id)),
+    },
+    {
+      key: 'locked',
+      label: 'Заблокировано',
+      items: nodes.filter((n) => getNodeStatus(n, completedNodeIds) === NODE_STATUS.LOCKED),
+    },
+  ]
+
   /** Содержимое сайдбара — общее для desktop-колонки и mobile-drawer. */
   const sidebarContent = (
     <>
-      <ProgressSidebar totalNodes={totalNodes} completedNodes={completedNodes} />
-      {nodes.map((node) => (
-        <div key={node.id} className="mt-4">
-          <MarkCompleteButton
-            node={node}
-            completedNodeIds={completedNodeIds}
-            isCompleted={completedNodeIds.has(node.id)}
-            onToggle={(completed) => {
-              setCompletedNodeIds((prev) => {
-                const next = new Set(prev)
-                if (completed) {
-                  next.add(node.id)
-                } else {
-                  next.delete(node.id)
-                }
-                return next
-              })
-            }}
-          />
+      {showHint && (
+        <div className="mb-4 bg-primary/10 border border-primary/40 rounded-lg p-3 text-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
+              <p className="text-foreground/90">
+                Кликни узел на графе — увидишь навык и материалы. Пройди источник и отметь
+                пройденным — это откроет следующие узлы.
+              </p>
+            </div>
+            <button
+              onClick={dismissHint}
+              aria-label="Скрыть подсказку"
+              className="p-0.5 rounded hover:bg-secondary shrink-0"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </button>
+          </div>
         </div>
-      ))}
+      )}
+
+      <ProgressSidebar totalNodes={totalNodes} completedNodes={completedNodes} />
+
+      {/* Карточка выбранного узла: что это, зачем и отметка прогресса. */}
+      {selectedNode && selectedStatus && (
+        <div className="mt-4 bg-card border border-primary/50 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold leading-snug">{selectedNode.title}</h3>
+            <button
+              onClick={() => setSelectedNodeId(null)}
+              aria-label="Закрыть карточку"
+              className="p-0.5 rounded hover:bg-secondary shrink-0"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </button>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Сложность: {selectedNode.difficulty}/10
+          </div>
+          {selectedNode.description && (
+            <p className="text-sm text-muted-foreground mt-2">{selectedNode.description}</p>
+          )}
+
+          {selectedNode.resources.length > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                <BookOpen className="w-3.5 h-3.5" aria-hidden />
+                Материалы для прохождения
+              </div>
+              <ul className="space-y-1">
+                {selectedNode.resources.slice(0, 4).map((resource) => (
+                  <li key={resource.url}>
+                    <a
+                      href={resource.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline break-words"
+                    >
+                      {resource.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-3">
+            <MarkCompleteButton
+              node={selectedNode}
+              completedNodeIds={completedNodeIds}
+              isCompleted={completedNodeIds.has(selectedNode.id)}
+              blockedByTitle={blockedByTitle(selectedNode)}
+              onToggle={(completed) => {
+                setCompletedNodeIds((prev) => {
+                  const next = new Set(prev)
+                  if (completed) {
+                    next.add(selectedNode.id)
+                  } else {
+                    next.delete(selectedNode.id)
+                  }
+                  return next
+                })
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {completedNodeIds.has(selectedNode.id)
+              ? 'Навык засчитан в прогресс и streak.'
+              : unlockCount > 0
+                ? `Отметка пройденным откроет ${unlockCount} след. навык(ов).`
+                : 'Отметка пройденным засчитает навык.'}
+          </p>
+        </div>
+      )}
+
+      {/* Список навыков по статусам: названия видны всегда, заблокированные — с причиной. */}
+      <div className="mt-4 space-y-4">
+        {statusGroups.map(
+          (group) =>
+            group.items.length > 0 && (
+              <div key={group.key}>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                  {group.label} · {group.items.length}
+                </h4>
+                <ul className="space-y-1">
+                  {group.items.map((node) => {
+                    const isSelected = node.id === selectedNodeId
+                    const isLocked = getNodeStatus(node, completedNodeIds) === NODE_STATUS.LOCKED
+                    const blocker = isLocked ? blockedByTitle(node) : null
+                    return (
+                      <li key={node.id}>
+                        <button
+                          onClick={() => handleNodeSelect(node.id)}
+                          className={cn(
+                            'w-full text-left px-2 py-1.5 rounded-md flex items-start gap-2 transition-colors',
+                            isSelected ? 'bg-secondary' : 'hover:bg-secondary/60'
+                          )}
+                        >
+                          {completedNodeIds.has(node.id) ? (
+                            <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" aria-hidden />
+                          ) : isLocked ? (
+                            <Lock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+                          ) : (
+                            <Circle className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
+                          )}
+                          <span className="min-w-0">
+                            <span className="block text-sm leading-snug">{node.title}</span>
+                            {blocker && (
+                              <span className="block text-xs text-muted-foreground">
+                                после «{blocker}»
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+        )}
+      </div>
     </>
   )
 
   return (
+
     <TreePageLayout
       tree={tree}
       isOwner={isOwner}
@@ -517,7 +662,7 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
               nodes={nodes}
               edges={edges}
               completedNodeIds={completedNodeIds}
-              onNodeClick={(nodeId) => void handleNodeClick(nodeId)}
+              onNodeClick={handleNodeSelect}
               onResourceClick={handleResourceClick}
             />
           </div>
