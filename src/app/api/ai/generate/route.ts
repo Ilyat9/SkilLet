@@ -124,6 +124,65 @@ function clampCoordinate(value: number): number {
   return Math.max(-NODE_POSITION_LIMIT, Math.min(NODE_POSITION_LIMIT, Math.round(value)))
 }
 
+/**
+ * Раскладка узлов AI-дерева. Координатам от LLM доверия нет (типичный шаг
+ * сетки ~100px при карточке 224px — узлы наезжают друг на друга), поэтому
+ * позиция считается из графа связей: слои по самому длинному пути от корней,
+ * внутри слоя — рядами. Шаг X=250/Y=220 подобран под карточку w-56 (~224px)
+ * и гарантирует укладку в лимит ±1000 до 8 колонок на ряд.
+ */
+function layoutAiNodes(nodes: AiTreeResponse['nodes'], edges: readonly DagEdge[]): { x: number; y: number }[] {
+  const count = nodes.length
+  const incoming = new Array<number>(count).fill(0)
+  const children: number[][] = nodes.map(() => [])
+  for (const edge of edges) {
+    const from = Number(edge.sourceId)
+    const to = Number(edge.targetId)
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= count || to >= count) continue
+    incoming[to] = (incoming[to] ?? 0) + 1
+    children[from]?.push(to)
+  }
+
+  // Слой узла = самый длинный путь от корня (слой корней — 0).
+  const layer = new Array<number>(count).fill(0)
+  const remaining = [...incoming]
+  const queue = nodes.map((_, i) => i).filter((i) => incoming[i] === 0)
+  for (let head = 0; head < queue.length; head += 1) {
+    const cur = queue[head] ?? 0
+    for (const next of children[cur] ?? []) {
+      if (layer[next] !== undefined && layer[next] < (layer[cur] ?? 0) + 1) layer[next] = (layer[cur] ?? 0) + 1
+      remaining[next] = (remaining[next] ?? 0) - 1
+      if (remaining[next] === 0) queue.push(next)
+    }
+  }
+
+  // Внутри слоя — рядами не более 8 колонок, центрирование по X.
+  const MAX_COLS = 8
+  const STEP_X = 250
+  const STEP_Y = 220
+  const byLayer = new Map<number, number[]>()
+  nodes.forEach((_, i) => {
+    const arr = byLayer.get(layer[i] ?? 0) ?? []
+    arr.push(i)
+    byLayer.set(layer[i] ?? 0, arr)
+  })
+
+  const result: { x: number; y: number }[] = nodes.map(() => ({ x: 0, y: 0 }))
+  let yCursor = 0
+  for (const l of [...byLayer.keys()].sort((a, b) => a - b)) {
+    const idxs = byLayer.get(l) ?? []
+    for (let rowStart = 0; rowStart < idxs.length; rowStart += MAX_COLS) {
+      const row = idxs.slice(rowStart, rowStart + MAX_COLS)
+      const offset = ((row.length - 1) / 2) * STEP_X
+      row.forEach((nodeIdx, col) => {
+        result[nodeIdx] = { x: col * STEP_X - offset, y: yCursor }
+      })
+      yCursor += STEP_Y
+    }
+  }
+  return result
+}
+
 /** Нормализует ответ LLM: зажимает координаты/числа в допустимые границы схемы узлов. */
 function normalizeAiTree(raw: AiTreeResponse): AiTreeResponse {
   return {
@@ -355,6 +414,9 @@ export async function POST(request: NextRequest) {
     const aiTree = generation.tree
     const acceptedConnections = filterAcyclicConnections(aiTree.nodes.length, aiTree.connections)
 
+    // Раскладка считается сервером из графа связей — координаты LLM не используются.
+    const layout = layoutAiNodes(aiTree.nodes, acceptedConnections)
+
     // Сохраняем одной транзакцией: Tree → вложенный create Node[] → createMany Edge[]
     // (тот же паттерн, что в prisma/seed.ts).
     const treeId = await prisma.$transaction(async (tx) => {
@@ -366,11 +428,11 @@ export async function POST(request: NextRequest) {
           isPublic: true,
           authorId: userId,
           nodes: {
-            create: aiTree.nodes.map((node) => ({
+            create: aiTree.nodes.map((node, nodeIndex) => ({
               title: node.title,
               description: node.description ?? null,
-              positionX: node.positionX,
-              positionY: node.positionY,
+              positionX: clampCoordinate(layout[nodeIndex]?.x ?? 0),
+              positionY: clampCoordinate(layout[nodeIndex]?.y ?? 0),
               difficulty: node.difficulty,
               resources:
                 node.resourceType && node.resourceUrl && node.resourceTitle
