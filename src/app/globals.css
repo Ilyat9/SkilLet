@@ -114,10 +114,12 @@
   --secondary-foreground: 35 25% 87%;
   --card: 25 16% 16%;
   --card-foreground: 35 25% 87%;
-  --border: 25 12% 26%;
+  /* Рамка заметно светлее фона: пунктир заблокированных узлов и волосяные
+     линейки не должны растворяться в коже. */
+  --border: 25 14% 31%;
 
   --muted: 25 14% 19%;
-  --muted-foreground: 32 14% 70%;    /* 8+:1 на фоне */
+  --muted-foreground: 32 14% 74%;   /* 8+:1 на фоне */
 
   --accent: 12 60% 58%;              /* бейджи: почти чёрный текст ~5:1 */
   --accent-foreground: 20 30% 8%;
@@ -238,6 +240,18 @@
     font-family: var(--font-geist-mono), ui-monospace, monospace;
     font-size: 0.9em;
     letter-spacing: 0.02em;
+  }
+
+  /* Слайдеры сложности в каталоге: трек в палитру вместо дефолтного белого,
+     который выбивается на тёмной теме. */
+  input[type='range'] {
+    accent-color: hsl(var(--primary));
+  }
+  input[type='range']::-webkit-slider-runnable-track {
+    background: hsl(var(--border));
+  }
+  input[type='range']::-moz-range-track {
+    background: hsl(var(--border));
   }
 }
 

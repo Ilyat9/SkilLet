@@ -270,6 +270,11 @@ export default function ExplorePage() {
           )
         ) : (
           <>
+            {/* Счётчик закрывает «пустыню» под списком и отвечает на вопрос
+                «сколько вообще найдено» без листания пагинации. */}
+            <p className="text-xs text-muted-foreground mb-3" aria-live="polite">
+              Найдено: {trees.total}
+            </p>
             {/* Разворот бестиария: записи в две колонки, метаданные на полях
                 каждой записи (см. TreeCard variant="ledger"). Не grid 3xN. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 items-start">

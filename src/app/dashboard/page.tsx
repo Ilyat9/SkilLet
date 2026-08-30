@@ -123,7 +123,7 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        ) : trees.length === 0 ? (
+        ) : trees.every((t) => (t._count?.nodes ?? 0) === 0) ? (
           <>
             {/* Онбординг: у нового пользователя нет своих деревьев — показываем
                 готовые публичные деревья сообщества вместо пустого состояния. */}
@@ -175,14 +175,20 @@ export default function DashboardPage() {
           </>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {trees.map((tree) => (
-              <TreeCard
-                key={tree.id}
-                tree={tree}
-                isPublic={tree.isPublic}
-                onSelect={() => router.push(`/tree/${tree.id}`)}
-              />
-            ))}
+            {/* Деревья без узлов не рисуем карточками: среди заполненных они
+                выглядят сломавшейся заглушкой (пустые — сид-артефакт или
+                черновик без содержимого). Полностью пустой дашборд обслуживает
+                ветка empty state выше. */}
+            {trees
+              .filter((t) => (t._count?.nodes ?? 0) > 0)
+              .map((tree) => (
+                <TreeCard
+                  key={tree.id}
+                  tree={tree}
+                  isPublic={tree.isPublic}
+                  onSelect={() => router.push(`/tree/${tree.id}`)}
+                />
+              ))}
           </div>
         )}
       </div>

@@ -49,7 +49,7 @@ export default function Home() {
             <div className="py-5">
               <h3 className="text-lg font-semibold mb-1">Серия дней и достижения</h3>
               <p className="text-muted-foreground text-sm">
-                Streak растёт, пока вы отмечаете узлы хотя бы раз в день; за вехи
+                Серия дней растёт, пока вы отмечаете узлы хотя бы раз в день; за вехи
                 выдаются достижения.
               </p>
             </div>

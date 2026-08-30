@@ -77,7 +77,7 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect, onToggleLike, ca
           <h3 className="text-lg font-semibold text-foreground leading-snug">{tree.title}</h3>
           {tree.author && (
             <p className="text-xs text-muted-foreground mt-0.5">
-              задокументировал {tree.author.name || 'Unknown'}
+              автор: {tree.author.name || 'Unknown'}
             </p>
           )}
           {tree.description && (
