@@ -81,10 +81,52 @@ export type TreeCategoryValue = (typeof TREE_CATEGORIES)[number]
 export const TREE_CATEGORY_LABELS: Record<TreeCategoryValue, string> = {
   FRONTEND: 'Frontend',
   BACKEND: 'Backend',
-  DEVOPS: 'DevOps',
-  DATA_SCIENCE: 'Data Science',
+  DATA_SCIENCE: 'Data Science / ML',
   SOFT_SKILLS: 'Soft Skills',
   DESIGN: 'Design',
+  LANGUAGES: 'Иностранные языки',
   OTHER: 'Другое',
 }
+
+export interface AiDurationOption {
+  id: string
+  /** Подпись для селектора срока обучения в UI. */
+  label: string
+  /** Формулировка срока для промпта LLM («рассчитан на ~X недель»). */
+  weeksLabel: string
+  /** Границы количества узлов дерева, которые запрашиваются у модели под этот срок. */
+  minNodes: number
+  maxNodes: number
+}
+
+/**
+ * Пресеты срока обучения для AI-генерации: чем длиннее срок — тем больше узлов
+ * просит промпт у модели. Границы откалиброваны по живому прогону бесплатных
+ * моделей OpenRouter (2026-08-30): деревья до ~30 узлов рабочая модель
+ * (minimax-m3:free) собирала за 1–20с без проблем, поэтому нижние сроки
+ * подняты выше дефолта, что был до этой фичи (8–20). Верхняя граница (45)
+ * остаётся консервативной: там же на дереве в ~38 узлов при нагрузке ответ
+ * занимал 15–58с — то есть top-уровень уже балансирует на грани таймаута
+ * одного запроса, и лучше не толкать выше. Единственный источник границ —
+ * эта константа: правь только тут.
+ */
+export const AI_DURATION_OPTIONS: readonly AiDurationOption[] = [
+  { id: 'short', label: '1–2 недели', weeksLabel: '1–2 недели', minNodes: 10, maxNodes: 20 },
+  { id: 'month', label: '1 месяц', weeksLabel: 'около 4 недель', minNodes: 16, maxNodes: 24 },
+  { id: 'quarter', label: '3 месяца', weeksLabel: 'около 12 недель', minNodes: 22, maxNodes: 32 },
+  { id: 'half_year', label: '6 месяцев', weeksLabel: 'около 24 недель', minNodes: 28, maxNodes: 38 },
+  { id: 'year', label: '1 год и более', weeksLabel: 'год и более', minNodes: 34, maxNodes: 45 },
+] as const
+
+export type AiDurationId = (typeof AI_DURATION_OPTIONS)[number]['id']
+
+/** Дефолт совпадает по духу со старым диапазоном 8–20, но чуть выше нижней планки. */
+export const DEFAULT_AI_DURATION_ID: AiDurationId = 'month'
+
+/** Готовый объект дефолтного срока — чтобы вызывающему коду не нужно было руками ловить undefined от .find(). */
+export const DEFAULT_AI_DURATION_OPTION: AiDurationOption = (() => {
+  const found = AI_DURATION_OPTIONS.find((option) => option.id === DEFAULT_AI_DURATION_ID)
+  if (!found) throw new Error('DEFAULT_AI_DURATION_ID не найден в AI_DURATION_OPTIONS')
+  return found
+})()
 

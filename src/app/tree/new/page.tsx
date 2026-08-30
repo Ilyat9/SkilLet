@@ -6,7 +6,15 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/shared/ui/Button'
 import { Modal } from '@/shared/ui/Modal'
 import { TEMPLATES, type SkillTemplate } from '@/shared/constants/templates'
-import { TREE_CATEGORIES, TREE_CATEGORY_LABELS, type TreeCategoryValue } from '@/shared/constants'
+import {
+  TREE_CATEGORIES,
+  TREE_CATEGORY_LABELS,
+  type TreeCategoryValue,
+  AI_DURATION_OPTIONS,
+  DEFAULT_AI_DURATION_ID,
+  DEFAULT_AI_DURATION_OPTION,
+  type AiDurationId,
+} from '@/shared/constants'
 import { TreeExportSchema } from '@/entities/tree/model/schemas'
 import { cn } from '@/shared/lib/utils'
 import { Loader2, ArrowLeft, Sparkles, FileUp, FileWarning } from 'lucide-react'
@@ -40,6 +48,9 @@ export default function NewTreePage() {
 
   // Состояние AI-генерации
   const [topic, setTopic] = useState('')
+  const [duration, setDuration] = useState<AiDurationId>(DEFAULT_AI_DURATION_ID)
+  const selectedDuration =
+    AI_DURATION_OPTIONS.find((option) => option.id === duration) ?? DEFAULT_AI_DURATION_OPTION
   const [isGenerating, setIsGenerating] = useState(false)
   const [genStep, setGenStep] = useState(0)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -138,7 +149,7 @@ export default function NewTreePage() {
       const response = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim(), category }),
+        body: JSON.stringify({ topic: topic.trim(), category, duration }),
       })
       const result = await response.json()
       if (result.error) {
@@ -342,6 +353,24 @@ export default function NewTreePage() {
                   disabled={isGenerating}
                   className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 resize-none"
                 />
+                <div>
+                  <label htmlFor="ai-duration" className="block text-sm font-medium mb-1">
+                    Срок обучения
+                  </label>
+                  <select
+                    id="ai-duration"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value as AiDurationId)}
+                    disabled={isGenerating}
+                    className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                  >
+                    {AI_DURATION_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <Button
                   onClick={() => void handleGenerate()}
                   disabled={isGenerating || topic.trim().length < 3}
@@ -392,8 +421,8 @@ export default function NewTreePage() {
                 )}
                 {!isGenerating && (
                   <p className="text-xs text-text-tertiary text-center">
-                    Модель придумает 8–20 узлов со связями и ресурсами — останется только учиться.
-                    Обычно занимает 10–30 секунд.
+                    Модель придумает {selectedDuration.minNodes}–{selectedDuration.maxNodes} узлов со связями и
+                    материалом на каждом — останется только учиться. Обычно занимает 10–40 секунд.
                   </p>
                 )}
               </div>

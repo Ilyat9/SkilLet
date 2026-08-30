@@ -9,7 +9,7 @@ import { createSuccessResponse, createErrorResponse } from '@/shared/lib/utils'
 import { parseJsonBody } from '@/shared/lib/api'
 import { checkRateLimit, RATE_LIMITS } from '@/shared/lib/rateLimit'
 import { hasCycle } from '@/shared/lib/dag'
-import { NODE_POSITION_LIMIT } from '@/shared/constants'
+import { NODE_POSITION_LIMIT, AI_DURATION_OPTIONS, DEFAULT_AI_DURATION_OPTION, type AiDurationOption } from '@/shared/constants'
 import { TreeCategorySchema } from '@/entities/tree/model/schemas'
 
 /**
@@ -37,17 +37,28 @@ import { TreeCategorySchema } from '@/entities/tree/model/schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// Большие сроки обучения просят у модели больше узлов → дольше генерация.
+// Явно поднимаем лимит платформы, чтобы TOTAL_DEADLINE_MS ниже не обрезался
+// дефолтным лимитом функции раньше собственного дедлайна запроса.
+export const maxDuration = 60
 
 /** Не чаще нескольких генераций в минуту на пользователя (см. RATE_LIMITS.aiGenerate). */
-/** Таймаут одного запроса к LLM — чтобы запрос не висел неопределённо. */
-const LLM_TIMEOUT_MS = 30_000
+/**
+ * Таймаут одного запроса к LLM. Масштабируется от целевого числа узлов
+ * (см. AI_DURATION_OPTIONS) — более длинному дереву нужно больше токенов
+ * на генерацию, а значит и больше времени на ответ провайдера.
+ */
+const LLM_TIMEOUT_BASE_MS = 25_000
+const LLM_TIMEOUT_PER_NODE_MS = 400
+const LLM_TIMEOUT_MAX_MS = 45_000
 /** Сообщение при таймауте LLM: пользовательский ответ маппится в 504. */
-const LLM_TIMEOUT_DESCRIPTION = 'AI-сервис не ответил за 30 секунд'
+const LLM_TIMEOUT_DESCRIPTION = 'AI-сервис не ответил вовремя'
 /**
  * Общий дедлайн всей цепочки моделей (включая фолбэки): ограничивает худший
- * случай, чтобы Serverless Function не упёрлась в лимит времени платформы.
+ * случай, чтобы Serverless Function не упёрлась в лимит времени платформы
+ * (maxDuration = 60 выше — оставляем 2с запаса на сохранение в БД и ответ).
  */
-const TOTAL_DEADLINE_MS = 55_000
+const TOTAL_DEADLINE_MS = 58_000
 
 /** Максимум попыток получить валидный JSON от модели. */
 const MAX_ATTEMPTS = 2
@@ -56,27 +67,39 @@ const GenerateRequestSchema = z.object({
   topic: z.string().min(3, 'Тема слишком короткая').max(200, 'Слишком длинная тема'),
   // Категория дерева: необязательна — без неё дерево сохранится как OTHER.
   category: TreeCategorySchema.optional(),
+  // Срок обучения: необязателен — без него используется DEFAULT_AI_DURATION_ID.
+  duration: z
+    .enum(AI_DURATION_OPTIONS.map((o) => o.id) as [string, ...string[]])
+    .optional(),
 })
 
+/**
+ * Материал обязателен на каждом узле (не .optional()) — без него узел
+ * бесполезен как шаг плана обучения. Промпт в callLlm() требует по одному
+ * ресурсу на узел; схема здесь этого не ослабляет.
+ */
 const AiNodeSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   difficulty: z.number().int().min(1).max(10),
   positionX: z.number(),
   positionY: z.number(),
-  resourceType: z.enum(['video', 'article']).optional(),
-  resourceUrl: z.string().url().optional(),
-  resourceTitle: z.string().max(200).optional(),
+  resourceType: z.enum(['video', 'article']),
+  resourceUrl: z.string().url(),
+  resourceTitle: z.string().min(1).max(200),
 })
 
-const AiTreeSchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().max(1000).optional(),
-  nodes: z.array(AiNodeSchema).min(8, 'Должно быть 8–20 узлов').max(20),
-  connections: z.array(z.tuple([z.number().int(), z.number().int()])),
-})
+/** Схема дерева с границами числа узлов, зависящими от выбранного срока обучения. */
+function buildAiTreeSchema(minNodes: number, maxNodes: number) {
+  return z.object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(1000).optional(),
+    nodes: z.array(AiNodeSchema).min(minNodes, `Должно быть ${minNodes}–${maxNodes} узлов`).max(maxNodes),
+    connections: z.array(z.tuple([z.number().int(), z.number().int()])),
+  })
+}
 
-type AiTreeResponse = z.infer<typeof AiTreeSchema>
+type AiTreeResponse = z.infer<ReturnType<typeof buildAiTreeSchema>>
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>
@@ -85,15 +108,20 @@ interface ChatCompletionResponse {
 const OPENAI_API_URL = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1'
 
 /**
- * Встроенные резервные модели (бесплатный тир OpenRouter, проверены 2026-08:
- * все заявляют поддержку response_format/structured_outputs). Порядок —
- * от крупной к меньшей: сначала мощные модели, слабые — в конце.
- * Список обновляется вручную по мере ротации бесплатного тира:
- *   curl -s https://openrouter.ai/api/v1/models | фильтр по ':free'
+ * Встроенные резервные модели (бесплатный тир OpenRouter). Порядок — по
+ * реальной проверке вживую 2026-08-30 (несколько прогонов через реальный
+ * API с разными темами/размерами дерева): nvidia/nemotron-3-super-120b-a12b:free
+ * исключена — в 100% попыток либо не отвечала до таймаута, либо съедала
+ * 25-40с впустую перед падением на следующую модель, не давая ни одного
+ * валидного ответа. minimax/minimax-m3:free — единственная стабильно
+ * рабочая модель в тесте (валидный JSON, материал на всех узлах, разумная
+ * сложность), но не мгновенная — на большом дереве (~38 узлов) при
+ * нагрузке отвечала 15-58с. Список обновляется вручную по мере ротации
+ * бесплатного тира: curl -s https://openrouter.ai/api/v1/models | фильтр
+ * по ':free'
  */
 const DEFAULT_FALLBACK_MODELS = [
   'z-ai/glm-5.2:free',
-  'nvidia/nemotron-3-super-120b-a12b:free',
   'minimax/minimax-m3:free',
   'google/gemma-4-31b-it:free',
 ] as const
@@ -128,8 +156,9 @@ function clampCoordinate(value: number): number {
  * Раскладка узлов AI-дерева. Координатам от LLM доверия нет (типичный шаг
  * сетки ~100px при карточке 224px — узлы наезжают друг на друга), поэтому
  * позиция считается из графа связей: слои по самому длинному пути от корней,
- * внутри слоя — рядами. Шаг X=250/Y=220 подобран под карточку w-56 (~224px)
- * и гарантирует укладку в лимит ±1000 до 8 колонок на ряд.
+ * внутри слоя — рядами. Шаг X=250/Y=220 подобран под карточку w-56 (~224px);
+ * для длинных деревьев (много слоёв) шаг между слоями адаптивно уменьшается,
+ * чтобы не упереться в NODE_POSITION_LIMIT и не схлопнуть узлы в одну точку.
  */
 function layoutAiNodes(nodes: AiTreeResponse['nodes'], edges: readonly DagEdge[]): { x: number; y: number }[] {
   const count = nodes.length
@@ -159,7 +188,7 @@ function layoutAiNodes(nodes: AiTreeResponse['nodes'], edges: readonly DagEdge[]
   // Внутри слоя — рядами не более 8 колонок, центрирование по X.
   const MAX_COLS = 8
   const STEP_X = 250
-  const STEP_Y = 220
+  const BASE_STEP_Y = 220
   const byLayer = new Map<number, number[]>()
   nodes.forEach((_, i) => {
     const arr = byLayer.get(layer[i] ?? 0) ?? []
@@ -175,8 +204,19 @@ function layoutAiNodes(nodes: AiTreeResponse['nodes'], edges: readonly DagEdge[]
   const depth = layers.length
   const widestRow = Math.max(...layers.map((l) => Math.ceil((byLayer.get(l) ?? []).length / MAX_COLS)))
   const horizontal = depth >= 5 && widestRow <= 2
-  const STEP_COL = 340
+  const BASE_STEP_COL = 340
   const STEP_ROW_H = 240
+
+  // Длинные деревья (см. AI_DURATION_OPTIONS.maxNodes до 45) могут дать много
+  // слоёв — при фиксированном шаге координата вышла бы за NODE_POSITION_LIMIT
+  // и clampCoordinate() схлопнул бы разные узлы в одну точку. Поэтому шаг
+  // между слоями уменьшается, если слоёв много, но не превышает базовый.
+  // Обе координаты (l * STEP_COL и накопительный yCursor) растут только в
+  // одну сторону от 0, поэтому бюджет — односторонний лимит с небольшим запасом.
+  const SPAN_BUDGET = NODE_POSITION_LIMIT - 200
+  const totalRows = layers.reduce((sum, l) => sum + Math.ceil((byLayer.get(l) ?? []).length / MAX_COLS), 0)
+  const STEP_COL = horizontal && depth > 1 ? Math.min(BASE_STEP_COL, Math.floor(SPAN_BUDGET / (depth - 1))) : BASE_STEP_COL
+  const STEP_Y = !horizontal && totalRows > 1 ? Math.min(BASE_STEP_Y, Math.floor(SPAN_BUDGET / (totalRows - 1))) : BASE_STEP_Y
 
   let yCursor = 0
   if (horizontal) {
@@ -254,37 +294,109 @@ function extractJson(raw: string): unknown {
   return JSON.parse(jsonText.trim()) as unknown
 }
 
-async function callLlm(topic: string, model: string, stricterInstruction?: string): Promise<string> {
+/**
+ * Модели на практике иногда превышают запрошенный потолок числа узлов
+ * (проверено вживую: minimax возвращал >maxNodes на большом дереве). Вместо
+ * того чтобы жёстко отбраковывать весь ответ и тратить целый повторный
+ * круг, лишние узлы с конца просто обрезаются, а связи, ссылавшиеся на
+ * обрезанные индексы, отбрасываются — на дерево это не влияет: overshoot
+ * означает «модель детализировала чуть больше, чем нужно», а не сломанную
+ * структуру у первых maxNodes узлов.
+ */
+function trimOversizedTree(raw: unknown, maxNodes: number): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw
+  const obj = raw as Record<string, unknown>
+  if (!Array.isArray(obj.nodes) || obj.nodes.length <= maxNodes) return raw
+
+  const connections = Array.isArray(obj.connections) ? obj.connections : []
+  const trimmedConnections = connections.filter(
+    (pair): pair is [number, number] =>
+      Array.isArray(pair) &&
+      pair.length === 2 &&
+      typeof pair[0] === 'number' &&
+      typeof pair[1] === 'number' &&
+      pair[0] < maxNodes &&
+      pair[1] < maxNodes
+  )
+
+  return { ...obj, nodes: obj.nodes.slice(0, maxNodes), connections: trimmedConnections }
+}
+
+/** max_tokens запроса: пропорционален целевому числу узлов, чтобы длинные деревья не обрезались. */
+function estimateMaxTokens(maxNodes: number): number {
+  return Math.min(8000, Math.max(2000, 1200 + maxNodes * 150))
+}
+
+async function callLlm(
+  topic: string,
+  model: string,
+  duration: AiDurationOption,
+  stricterInstruction?: string
+): Promise<string> {
   const systemPrompt =
-    'Ты методист обучающих skill-tree. Возвращай СТРОГО валидный JSON без markdown-обёрток, комментариев и пояснений. Только JSON.'
+    'Ты опытный методист, который проектирует учебные планы (skill-tree) по любой теме — ' +
+    'технической и нетехнической. Возвращай СТРОГО валидный JSON без markdown-обёрток, ' +
+    'комментариев и пояснений. Только JSON. Никогда не выдумывай факты, названия курсов ' +
+    'или ссылки, которых не существует, — только то, в чём ты уверен.'
 
   let userPrompt =
-    `Составь план обучения по теме "${topic}" в виде дерева навыков.\n` +
+    `Составь план обучения по теме "${topic}" в виде дерева навыков, рассчитанный на срок ` +
+    `обучения ${duration.weeksLabel} (примерно 3–5 часов занятий в неделю).\n` +
     'Формат JSON:\n' +
     '{\n' +
     '  "title": "название дерева (до 200 символов)",\n' +
     '  "description": "краткое описание (до 1000 символов)",\n' +
     '  "nodes": [\n' +
     '    {\n' +
-    '      "title": "...",\n' +
-    '      "description": "...",\n' +
+    '      "title": "название навыка/шага",\n' +
+    '      "description": "что конкретно нужно освоить на этом шаге",\n' +
     '      "difficulty": число 1-10,\n' +
     '      "positionX": число,\n' +
     '      "positionY": число,\n' +
-    '      "resourceType": "video" или "article" (опционально),\n' +
-    '      "resourceUrl": "https://..." (опционально),\n' +
-    '      "resourceTitle": "..." (опционально)\n' +
+    '      "resourceType": "video" или "article",\n' +
+    '      "resourceUrl": "https://...",\n' +
+    '      "resourceTitle": "название источника"\n' +
     '    }\n' +
     '  ],\n' +
     '  "connections": [[индекс узла-источника, индекс узла-цели], ...]\n' +
     '}\n' +
-    'Требования: 8–20 узлов; первый узел — стартовый без входящих связей; связи образуют DAG без циклов;\n' +
-    'сложность растёт от старта к финалу; координаты идут сеткой с шагом ~150 по X и Y;\n' +
-    'где уместно добавляй один ресурс (официальную документацию или видео) с корректным https-URL.'
+    '\n' +
+    `Требования к структуре:\n` +
+    `- От ${duration.minNodes} до ${duration.maxNodes} узлов — план должен реально покрывать заявленный ` +
+    `срок ${duration.weeksLabel}, а не сжиматься до пары шагов. ${duration.maxNodes} — ЖЁСТКИЙ потолок: ` +
+    `если тема кажется шире, объединяй мелкие смежные темы в один узел вместо того, чтобы добавлять узлы ` +
+    'сверх лимита;\n' +
+    '- первый узел — стартовый, без входящих связей;\n' +
+    '- связи образуют DAG без циклов (никогда не веди связь назад к уже пройденному узлу);\n' +
+    '- координаты идут сеткой с шагом ~150 по X и Y (точная раскладка потом пересчитывается сервером, ' +
+    'важен только относительный порядок).\n' +
+    '\n' +
+    'Требования к сложности (difficulty, 1-10) — считай её реально, а не выдумывай на глаз:\n' +
+    '- 1-2: не требует предыдущих знаний по теме вообще;\n' +
+    '- 3-5: требует освоения нескольких предыдущих узлов дерева;\n' +
+    '- 6-8: требует уверенного владения большой частью дерева и самостоятельной практики;\n' +
+    '- 9-10: экспертный уровень, требует владения почти всем деревом.\n' +
+    'Сложность узла оценивай по РЕАЛЬНОЙ глубине и объёму его предпосылок в этом же дереве ' +
+    '(сколько узлов и насколько сложных нужно пройти раньше), а не просто по порядковому номеру. ' +
+    'У узлов на одном уровне дерева сложность может отличаться, если один из них объективно сложнее.\n' +
+    '\n' +
+    'Требования к материалу (resourceType/resourceUrl/resourceTitle) — ОБЯЗАТЕЛЕН на КАЖДОМ узле, ' +
+    'без исключений:\n' +
+    '- resourceType — СТРОГО одно из двух значений: "video" или "article". Никаких других слов ' +
+    '("course", "book", "podcast" и т.п.) — курс или книгу тоже указывай как "article";\n' +
+    '- используй только реально существующие, широко известные источники: официальную документацию, ' +
+    'Wikipedia, устоявшиеся образовательные платформы (MDN, freeCodeCamp, Coursera, Khan Academy и т.п.) — ' +
+    'то, в существовании и адресе чего ты действительно уверен;\n' +
+    '- если не уверен в точном адресе конкретной статьи/видео — давай ссылку на главную страницу или ' +
+    'корневой раздел документации/платформы, а не выдуманный глубокий URL;\n' +
+    '- НЕ придумывай несуществующие статьи, курсы, видео или авторов — лучше более общая, но настоящая ссылка, ' +
+    'чем точная, но выдуманная.'
 
   if (stricterInstruction) {
-    userPrompt += `\n\nПРЕДЫДУЩАЯ ПОПЫТКА ОТКЛОНЕНА: ${stricterInstruction}\nВерни исправленный JSON, строго соответствующий формату выше.`
+    userPrompt += `\n\nПРЕДЫДУЩАЯ ПОПЫТКА ОТКЛОНЕНА: ${stricterInstruction}\nВерни исправленный JSON, строго соответствующий формату и требованиям выше.`
   }
+
+  const timeoutMs = Math.min(LLM_TIMEOUT_MAX_MS, LLM_TIMEOUT_BASE_MS + duration.maxNodes * LLM_TIMEOUT_PER_NODE_MS)
 
   const response = await fetch(`${OPENAI_API_URL}/chat/completions`, {
     method: 'POST',
@@ -298,11 +410,12 @@ async function callLlm(topic: string, model: string, stricterInstruction?: strin
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.7,
+      temperature: 0.6,
+      max_tokens: estimateMaxTokens(duration.maxNodes),
       response_format: { type: 'json_object' },
     }),
     // Явный таймаут внешнего вызова: без него зависший провайдер держит запрос открытым.
-    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   })
 
   if (!response.ok) {
@@ -325,10 +438,12 @@ async function callLlm(topic: string, model: string, stricterInstruction?: strin
  * переживает исчезновение модели у провайдера без правок кода.
  */
 async function generateValidatedTree(
-  topic: string
+  topic: string,
+  duration: AiDurationOption
 ): Promise<{ tree: AiTreeResponse; model: string } | { error: string; timedOut?: boolean }> {
   let lastErrorDescription = ''
   const startedAt = Date.now()
+  const treeSchema = buildAiTreeSchema(duration.minNodes, duration.maxNodes)
 
   for (const model of MODEL_CHAIN) {
     let moveToNextModel = false
@@ -337,10 +452,15 @@ async function generateValidatedTree(
     if (Date.now() - startedAt > TOTAL_DEADLINE_MS) break
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS && !moveToNextModel; attempt += 1) {
+      // Дедлайн проверяется и перед каждой ПОВТОРНОЙ попыткой той же модели:
+      // на большом дереве один запрос может занять 30-50с (проверено вживую),
+      // и без этой проверки 2-я попытка того же медленного запроса могла бы
+      // вынести суммарное время далеко за maxDuration платформы.
+      if (Date.now() - startedAt > TOTAL_DEADLINE_MS) break
       try {
-        const rawContent = await callLlm(topic, model, attempt > 1 ? lastErrorDescription : undefined)
+        const rawContent = await callLlm(topic, model, duration, attempt > 1 ? lastErrorDescription : undefined)
 
-        const parsed = AiTreeSchema.safeParse(extractJson(rawContent))
+        const parsed = treeSchema.safeParse(trimOversizedTree(extractJson(rawContent), duration.maxNodes))
         if (parsed.success) {
           return { tree: normalizeAiTree(parsed.data), model }
         }
@@ -411,8 +531,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { topic, category } = validation.data
-    const generation = await generateValidatedTree(topic)
+    const { topic, category, duration: durationId } = validation.data
+    const duration =
+      AI_DURATION_OPTIONS.find((option) => option.id === durationId) ?? DEFAULT_AI_DURATION_OPTION
+    const generation = await generateValidatedTree(topic, duration)
 
     if ('error' in generation) {
       logApiError('POST /api/ai/generate', generation.error, {
@@ -454,10 +576,8 @@ export async function POST(request: NextRequest) {
               positionX: clampCoordinate(layout[nodeIndex]?.x ?? 0),
               positionY: clampCoordinate(layout[nodeIndex]?.y ?? 0),
               difficulty: node.difficulty,
-              resources:
-                node.resourceType && node.resourceUrl && node.resourceTitle
-                  ? [{ type: node.resourceType, url: node.resourceUrl, title: node.resourceTitle }]
-                  : [],
+              // Материал обязателен схемой AiNodeSchema — на этом этапе он всегда есть.
+              resources: [{ type: node.resourceType, url: node.resourceUrl, title: node.resourceTitle }],
             })),
           },
         },
@@ -492,6 +612,7 @@ export async function POST(request: NextRequest) {
       userId,
       treeId,
       nodesCount: aiTree.nodes.length,
+      duration: duration.id,
       topicLength: topic.length,
       model: generation.model,
       requestId,
