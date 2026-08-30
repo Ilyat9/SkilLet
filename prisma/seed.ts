@@ -1,7 +1,19 @@
 import { PrismaClient } from '@prisma/client'
-import { ACHIEVEMENT_DEFS } from '../src/shared/lib/gamification'
+import { ACHIEVEMENT_DEFS, type AchievementDef } from '../src/shared/lib/gamification'
 
 const prisma = new PrismaClient()
+
+/**
+ * Строковое имя lucide-иконки достижения для колонки Achievement.icon.
+ * В коде (gamification.ts) icon — это React-компонент для рендера, в БД он
+ * не сериализуется; в колонке хранится стабильное строковое имя
+ * (displayName компонента, напр. 'Footprints'), чтобы каталог достижений
+ * в БД оставался самодостаточным для API/клиентов. Резерв — code достижения,
+ * если у компонента нет displayName.
+ */
+function achievementIconKey(def: AchievementDef): string {
+  return def.icon.displayName ?? def.code
+}
 
 type NodeData = {
   title: string
@@ -120,8 +132,8 @@ async function main() {
   for (const def of ACHIEVEMENT_DEFS) {
     await prisma.achievement.upsert({
       where: { code: def.code },
-      update: { title: def.title, description: def.description, icon: def.icon },
-      create: { code: def.code, title: def.title, description: def.description, icon: def.icon },
+      update: { title: def.title, description: def.description, icon: achievementIconKey(def) },
+      create: { code: def.code, title: def.title, description: def.description, icon: achievementIconKey(def) },
     })
     achievementsSynced += 1
   }

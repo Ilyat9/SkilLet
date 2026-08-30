@@ -218,6 +218,9 @@ model Achievement {
   code        String @unique
   title       String
   description String
+  // Строковое имя lucide-иконки (displayName компонента, напр. 'Footprints'):
+  // рендер-компоненты живут в клиентском коде (ACHIEVEMENT_DEFS), в БД —
+  // сериализуемый идентификатор. Эмодзи здесь больше не хранятся.
   icon        String
 
   users UserAchievement[]
