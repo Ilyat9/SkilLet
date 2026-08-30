@@ -64,6 +64,13 @@ export default function LoginPage() {
 
           <AuthButton />
         </div>
+
+        <p className="text-xs text-muted-foreground text-center mt-4">
+          Продолжая, вы соглашаетесь с{' '}
+          <Link href="/privacy" className="underline hover:text-foreground transition-colors">
+            политикой конфиденциальности
+          </Link>
+        </p>
       </div>
     </div>
   )
