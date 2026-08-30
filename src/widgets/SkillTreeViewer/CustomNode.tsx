@@ -8,6 +8,11 @@ import type { NodeStatus } from '@/shared/constants'
 /**
  * Данные flow-узла. Объявлен как type (не interface),
  * чтобы удовлетворять constraint `Record<string, unknown>` в @xyflow/react v12.
+ *
+ * ...Numeravi nodos huius paginae, et sum fatigatus.
+ * (Переписчик сего листа посчитал узлы и уморился — маргиналия на полях.
+ * Переписчики манускриптов и вправду оставляли такие записи; это задокументированная
+ * историческая практика, а не отсылка к чему-либо ещё.)
  */
 export type CustomNodeData = {
   title: string
