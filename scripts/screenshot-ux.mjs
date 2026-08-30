@@ -38,11 +38,19 @@ const page = await browser.newPage()
 await page.setViewport({ width: 1400, height: 850 })
 await page.setCookie({ name: 'authjs.session-token', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' })
 
+page.on('console', (msg) => {
+  if (msg.type() === 'error') console.log('console-error:', msg.text().slice(0, 300))
+})
+page.on('pageerror', (err) => console.log('pageerror:', String(err).slice(0, 300)))
+
 await page.goto(`http://localhost:3000/tree/${treeId}`, { waitUntil: 'networkidle0', timeout: 60000 })
+await new Promise((r) => setTimeout(r, 3000))
+const bodyStart = await page.evaluate(() => document.body.innerText.slice(0, 200))
+console.log('body-start:', JSON.stringify(bodyStart))
 await page.waitForSelector('.react-flow__node', { timeout: 30000 })
 await new Promise((r) => setTimeout(r, 1500))
 
-// DOM-клик по узлу «Начало» (завершённый) — карточка должна показать его название.
+// DOM-клик по узлу «Начало» (завершённый) — карточка должна раскрыться под ним.
 const clicked = await page.evaluate(() => {
   const nodes = document.querySelectorAll('.react-flow__node [role="button"]')
   for (const n of nodes) {
@@ -52,13 +60,12 @@ const clicked = await page.evaluate(() => {
 })
 console.log('dom-click-dispatched:', clicked)
 await new Promise((r) => setTimeout(r, 1000))
-const cardTitle = await page.evaluate(() => {
-  const aside = document.querySelector('aside')
-  const headings = aside ? [...aside.querySelectorAll('h3')].map((h) => h.textContent) : []
-  return headings.find((t) => t && t !== 'Прогресс') ?? null
+const detailsOpen = await page.evaluate(() => {
+  const el = document.querySelector('.react-flow__node-details-Начало, [data-id^="details-"]')
+  return el ? (el.textContent || '').slice(0, 120) : null
 })
-console.log('card-title:', cardTitle)
-const hasCard = cardTitle !== null
+console.log('details-node:', detailsOpen)
+const hasCard = detailsOpen !== null
 console.log('card-opened:', hasCard)
 await new Promise((r) => setTimeout(r, 1200))
 page.on('console', (msg) => {

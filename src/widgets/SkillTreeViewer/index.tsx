@@ -15,16 +15,17 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { CustomNode, type CustomFlowNode, type CustomNodeData } from './CustomNode'
+import { DetailsNode, type DetailsFlowNode, type DetailsNodeData } from './DetailsNode'
 import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
 import type { Node as AppNode, Resource } from '@/entities/node/model/types'
-import { NODE_STATUS_CONFIG, NODE_STATUS_ORDER, type NodeStatus } from '@/shared/constants'
+import { NODE_STATUS_CONFIG, NODE_STATUS_ORDER, NODE_STATUS, type NodeStatus } from '@/shared/constants'
 import { cn } from '@/shared/lib/utils'
 import type { Edge as PrismaEdge } from '@prisma/client'
 
 // Кастомный тип узла для nodeTypes (нужен для типизации ReactFlow)
-type FlowNode = CustomFlowNode
+type FlowNode = CustomFlowNode | DetailsFlowNode
 
-const nodeTypes = { custom: CustomNode }
+const nodeTypes = { custom: CustomNode, details: DetailsNode }
 
 interface SkillTreeViewerProps {
   nodes: AppNode[]
@@ -32,6 +33,13 @@ interface SkillTreeViewerProps {
   completedNodeIds: Set<string>
   onNodeClick?: (nodeId: string) => void
   onResourceClick?: (nodeId: string, e: React.MouseEvent) => void
+  /** Выбранный узел: под ним раскрывается карточка с описанием и материалами. */
+  selectedNodeId?: string | null
+  onSelectNode?: (nodeId: string | null) => void
+  /** Обновление прогресса из карточки под узлом. */
+  onToggleProgress?: (nodeId: string, completed: boolean) => void
+  /** Заголовок пререквизита, блокирующего узел (для карточки и подсказок). */
+  getBlockedByTitle?: (nodeId: string) => string | null
 }
 
 function toAppResources(resources: Resource[]): Resource[] {
@@ -44,13 +52,18 @@ export function SkillTreeViewer({
   completedNodeIds,
   onNodeClick,
   onResourceClick,
+  selectedNodeId = null,
+  onSelectNode,
+  onToggleProgress,
+  getBlockedByTitle,
 }: SkillTreeViewerProps) {
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<FlowNode>([])
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  // Пересобираем flow-узлы при изменении дерева ИЛИ прогресса — статусы обновятся
+  // Пересобираем flow-узлы при изменении дерева ИЛИ прогресса — статусы обновятся.
+  // К выбранному узлу добавляем узел-карточку (DetailsNode) прямо под ним.
   const flowNodes = useMemo(() => {
-    return nodes.map((node): FlowNode => {
+    const graphNodes: FlowNode[] = nodes.map((node): FlowNode => {
       const status: NodeStatus = getNodeStatus(node, completedNodeIds)
       const isLocked = status === 'locked'
 
@@ -76,7 +89,54 @@ export function SkillTreeViewer({
         data,
       }
     })
-  }, [nodes, completedNodeIds, onNodeClick, onResourceClick])
+
+    if (!selectedNodeId) return graphNodes
+    const selected = nodes.find((n) => n.id === selectedNodeId)
+    if (!selected || !onToggleProgress) return graphNodes
+
+    const status = getNodeStatus(selected, completedNodeIds)
+    const unlockCount = edges
+      .filter((e) => e.sourceId === selected.id)
+      .filter((e) => {
+        const child = nodes.find((n) => n.id === e.targetId)
+        return child && getNodeStatus(child, completedNodeIds) === NODE_STATUS.LOCKED
+      }).length
+    const detailsData: DetailsNodeData = {
+      node: selected,
+      completedNodeIds,
+      status,
+      isCompleted: completedNodeIds.has(selected.id),
+      blockedByTitle: getBlockedByTitle?.(selected.id) ?? null,
+      unlockHint: completedNodeIds.has(selected.id)
+        ? 'Навык засчитан в прогресс и streak.'
+        : unlockCount > 0
+          ? `Отметка пройденным откроет ${unlockCount} след. навык(ов).`
+          : 'Отметка пройденным засчитает навык.',
+      onToggle: (completed) => onToggleProgress(selected.id, completed),
+      onClose: () => onSelectNode?.(null),
+    }
+    // Высота SkillNode ~150-190px + зазор; карточка перекрывает следующий слой
+    // сверху (это осознанно: она поверх рёбер и закрывается крестиком).
+    graphNodes.push({
+      id: `details-${selected.id}`,
+      type: 'details',
+      position: { x: selected.positionX, y: selected.positionY + 210 },
+      data: detailsData,
+      draggable: false,
+      selectable: false,
+    })
+    return graphNodes
+  }, [
+    nodes,
+    edges,
+    completedNodeIds,
+    onNodeClick,
+    onResourceClick,
+    selectedNodeId,
+    onToggleProgress,
+    onSelectNode,
+    getBlockedByTitle,
+  ])
 
   useEffect(() => {
     setReactFlowNodes(flowNodes)
@@ -127,6 +187,7 @@ export function SkillTreeViewer({
           <MiniMap
             pannable
             zoomable
+            style={{ width: 112, height: 72 }}
             bgColor="hsl(var(--card))"
             nodeColor="hsl(var(--muted))"
             nodeStrokeColor="hsl(var(--border))"
