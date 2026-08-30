@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { signOut } from 'next-auth/react'
 import { useProfileSummary } from './useProfileSummary'
@@ -34,8 +33,13 @@ function HeaderAvatar({ fallbackName }: { fallbackName?: string | null | undefin
   const summary = useProfileSummary()
   const src = summary?.avatarUrl ?? summary?.image ?? null
   const name = summary?.name ?? fallbackName
+  const [failed, setFailed] = useState(false)
 
-  if (!src) {
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  if (!src || failed) {
     return (
       <span className="w-8 h-8 rounded-full bg-primary/20 border border-border flex items-center justify-center text-sm font-bold text-foreground">
         {(name ?? '?').charAt(0).toUpperCase()}
@@ -44,13 +48,17 @@ function HeaderAvatar({ fallbackName }: { fallbackName?: string | null | undefin
   }
 
   return (
-    <Image
+    // unoptimized: аватар 32px, оптимизатору нечего экономить, зато нет лишнего
+    // хопа через /_next/image (он же — точка отказа, если CDN недоступен).
+    // onError: сеть/хост недоступны → читаемые инициалы вместо битой картинки.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src={src}
       alt={name || 'User'}
       width={32}
       height={32}
       className="w-8 h-8 rounded-full"
-      unoptimized={(summary?.avatarUrl ?? src).endsWith('.svg')}
+      onError={() => setFailed(true)}
     />
   )
 }

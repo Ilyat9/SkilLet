@@ -50,19 +50,21 @@ console.log('body-start:', JSON.stringify(bodyStart))
 await page.waitForSelector('.react-flow__node', { timeout: 30000 })
 await new Promise((r) => setTimeout(r, 1500))
 
-// DOM-клик по узлу «Начало» (завершённый) — карточка должна раскрыться под ним.
+// DOM-клик по узлу «Старт» — карточка навыка должна появиться в сайдбаре справа.
 const clicked = await page.evaluate(() => {
   const nodes = document.querySelectorAll('.react-flow__node [role="button"]')
   for (const n of nodes) {
-    if ((n.textContent || '').includes('Начало')) { n.click(); return true }
+    if ((n.textContent || '').includes('Старт')) { n.click(); return true }
   }
   return false
 })
 console.log('dom-click-dispatched:', clicked)
 await new Promise((r) => setTimeout(r, 1000))
 const detailsOpen = await page.evaluate(() => {
-  const el = document.querySelector('.react-flow__node-details-Начало, [data-id^="details-"]')
-  return el ? (el.textContent || '').slice(0, 120) : null
+  const aside = document.querySelector('aside') ?? document.body
+  return (aside.textContent || '').includes('Материалы для прохождения') ||
+    (aside.textContent || '').includes('Отметить пройденным')
+    ? 'sidebar-card' : null
 })
 console.log('details-node:', detailsOpen)
 const hasCard = detailsOpen !== null

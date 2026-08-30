@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/features/auth/ui/useAuth'
+import { invalidateProfileSummary } from '@/widgets/Header/useProfileSummary'
 import { ACHIEVEMENT_DEFS, type AchievementDef } from '@/shared/lib/gamification'
 import { Badge } from '@/shared/ui/Badge'
 import { Flame, CheckCircle2, TreePine, Trophy } from 'lucide-react'
@@ -42,6 +43,7 @@ export default function ProfilePage() {
   // Выбранный аватар (null — фото GitHub). Оптимистично меняем на клиенте.
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isAvatarSaving, setIsAvatarSaving] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   const applyAvatar = async (next: string | null) => {
     if (isAvatarSaving) return
@@ -55,8 +57,12 @@ export default function ProfilePage() {
         body: JSON.stringify({ avatarUrl: next }),
       })
       if (!response.ok) throw new Error('save failed')
+      // Хедер читает профиль через отдельный кэш — сбрасываем, чтобы новый
+      // аватар появился сразу, без перезагрузки страницы.
+      invalidateProfileSummary()
     } catch {
       setAvatarUrl(previous) // откат при ошибке
+      setAvatarError('Не удалось сохранить аватар. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setIsAvatarSaving(false)
     }
@@ -138,17 +144,17 @@ export default function ProfilePage() {
   // Эффективный аватар: выбранный в профиле → фото GitHub → инициалы.
   const effectiveAvatar = avatarUrl ?? profile.user.image
   // DiceBear — детерминированные генеративные SVG (не нейросеть, бесплатно).
-  // Сид = id пользователя из сессии, поэтому наборы у всех разные, но стабильные.
+  // Сид = email/имя пользователя, поэтому наборы у всех разные, но стабильные.
   const avatarSeed = encodeURIComponent(profile.user.email ?? profile.user.name ?? 'user')
   const avatarOptions = [
+    { label: 'Notionists', url: `https://api.dicebear.com/9.x/notionists/svg?seed=${avatarSeed}` },
+    { label: 'Open Peeps', url: `https://api.dicebear.com/9.x/open-peeps/svg?seed=${avatarSeed}` },
+    { label: 'Micah', url: `https://api.dicebear.com/9.x/micah/svg?seed=${avatarSeed}` },
+    { label: 'Big Smile', url: `https://api.dicebear.com/9.x/big-smile/svg?seed=${avatarSeed}` },
+    { label: 'Avataaars', url: `https://api.dicebear.com/9.x/avataaars/svg?seed=${avatarSeed}` },
+    { label: 'Personas', url: `https://api.dicebear.com/9.x/personas/svg?seed=${avatarSeed}` },
     { label: 'Adventurer', url: `https://api.dicebear.com/9.x/adventurer/svg?seed=${avatarSeed}` },
-    { label: 'Lorelei', url: `https://api.dicebear.com/9.x/lorelei/svg?seed=${avatarSeed}` },
-    { label: 'Bottts', url: `https://api.dicebear.com/9.x/bottts/svg?seed=${avatarSeed}` },
-    { label: 'Fun Emoji', url: `https://api.dicebear.com/9.x/fun-emoji/svg?seed=${avatarSeed}` },
-    { label: 'Thumbs', url: `https://api.dicebear.com/9.x/thumbs/svg?seed=${avatarSeed}` },
     { label: 'Инициалы', url: `https://api.dicebear.com/9.x/initials/svg?seed=${avatarSeed}` },
-    { label: 'Идентикон', url: `https://api.dicebear.com/9.x/identicon/svg?seed=${avatarSeed}` },
-    { label: 'Pixel Art', url: `https://api.dicebear.com/9.x/pixel-art/svg?seed=${avatarSeed}` },
   ]
 
   const statCards = [
@@ -186,6 +192,11 @@ export default function ProfilePage() {
         {/* Выбор аватара: генеративные наборы DiceBear (бесплатные, не нейросеть) + фото GitHub */}
         <section aria-label="Выбор аватара">
           <h2 className="text-sm font-semibold text-muted-foreground mb-3">Аватар</h2>
+          {avatarError && (
+            <p role="alert" className="mb-3 text-sm text-destructive">
+              {avatarError}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             {avatarOptions.map((option) => (
               <button

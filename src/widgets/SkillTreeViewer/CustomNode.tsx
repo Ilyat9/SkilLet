@@ -17,8 +17,8 @@ export type CustomNodeData = {
   resources: Resource[]
   status: NodeStatus
   isInteractive: boolean
+  isSelected?: boolean
   onNodeClick?: (() => void) | undefined
-  onResourceClick?: ((e: React.MouseEvent) => void) | undefined
 }
 
 export type CustomFlowNode = Node<CustomNodeData, 'custom'>
@@ -46,8 +46,8 @@ export function CustomNode({ id, data }: NodeProps<CustomFlowNode>) {
         node={node}
         status={data.status}
         isInteractive={data.isInteractive}
+        isSelected={data.isSelected ?? false}
         onNodeClick={data.onNodeClick}
-        onResourceClick={data.onResourceClick}
       />
       <Handle id="source-bottom" type="source" position={Position.Bottom} isConnectable={false} className="!opacity-0" />
       <Handle id="source-right" type="source" position={Position.Right} isConnectable={false} className="!opacity-0" />

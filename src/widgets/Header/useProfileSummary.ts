@@ -58,3 +58,8 @@ export function useProfileSummary(): ProfileSummary | null {
 
   return summary
 }
+
+/** Сброс кэша (после смены аватара в профиле) — хедер перечитает /api/profile. */
+export function invalidateProfileSummary(): void {
+  cache = null
+}

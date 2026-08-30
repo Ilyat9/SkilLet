@@ -3,18 +3,18 @@
 import { Node } from '../model/types'
 import { ProgressBar } from '@/shared/ui/ProgressBar'
 import { NODE_STATUS_CONFIG, NODE_STATUS, NodeStatus } from '@/shared/constants'
-import { ExternalLink } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 
 interface SkillNodeProps {
   node: Node
   status: NodeStatus
   isInteractive?: boolean
+  /** Узел выбран на графе — заметная подсветка (детали открываются в сайдбаре). */
+  isSelected?: boolean
   onNodeClick?: (() => void) | undefined
-  onResourceClick?: ((e: React.MouseEvent) => void) | undefined
 }
 
-export function SkillNode({ node, status, isInteractive = false, onNodeClick, onResourceClick }: SkillNodeProps) {
+export function SkillNode({ node, status, isInteractive = false, isSelected = false, onNodeClick }: SkillNodeProps) {
   const config = NODE_STATUS_CONFIG[status]
 
   // Enter/Space активируют узел с клавиатуры так же, как клик мышью.
@@ -34,6 +34,7 @@ export function SkillNode({ node, status, isInteractive = false, onNodeClick, on
         config.color,
         {
           'hover:border-accent-strong transition-colors': isInteractive,
+          'ring-2 ring-primary ring-offset-2 ring-offset-background': isSelected,
           'pointer-events-none': !isInteractive,
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background':
             isInteractive,
@@ -65,32 +66,12 @@ export function SkillNode({ node, status, isInteractive = false, onNodeClick, on
       )}
 
       {status !== NODE_STATUS.LOCKED && (
-        <div className="relative mb-3">
+        <div className="relative mb-1">
           <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-muted-foreground">Сложность: {node.difficulty}/10</span>
           </div>
           <ProgressBar value={node.difficulty * 10} max={100} size="sm" ariaLabel={`Сложность навыка «${node.title}»`} />
         </div>
-      )}
-
-      {node.resources.length > 0 && status !== NODE_STATUS.LOCKED && (
-        <button
-          onClick={(e) => {
-            // Не триггерим toggle узла при клике по ресурсу.
-            e.stopPropagation()
-            onResourceClick?.(e)
-          }}
-          aria-label="Открыть материалы навыка"
-          className={cn(
-            'relative flex items-center justify-center gap-1 text-xs',
-            'bg-primary/10 text-primary hover:bg-primary/20',
-            'px-3 py-1.5 rounded transition-colors w-full',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-          )}
-        >
-          <ExternalLink className="w-3 h-3" aria-hidden />
-          Материалы
-        </button>
       )}
     </div>
   )

@@ -7,6 +7,7 @@ import { SkillTreeViewer } from '@/widgets/SkillTreeViewer'
 import { TreeEditor } from '@/features/tree-builder/ui/TreeEditor'
 import type { EditorNode, EditorEdge } from '@/features/tree-builder/model/useTreeEditor'
 import { ProgressSidebar } from '@/widgets/ProgressSidebar'
+import { NodeDetailsCard } from '@/widgets/SkillTreePage/NodeDetailsCard'
 import { Node as PrismaNode, Edge as PrismaEdge, Tree } from '@prisma/client'
 import Link from 'next/link'
 import { parseResources } from '@/entities/node/model/schemas'
@@ -201,6 +202,15 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
     }
   }
 
+  // Выбранный узел + сколько заблокированных детей он откроет (для карточки в сайдбаре).
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId) ?? null
+  const unlockCountFor = (nodeId: string) =>
+    edges.filter((e) => {
+      if (e.sourceId !== nodeId) return false
+      const child = nodes.find((n) => n.id === e.targetId)
+      return child !== undefined && getNodeStatus(child, completedNodeIds) === NODE_STATUS.LOCKED
+    }).length
+
   /** Обновление прогресса из карточки под узлом (ставит/снимает отметку локально). */
   const handleToggleProgress = (nodeId: string, completed: boolean) => {
     setCompletedNodeIds((prev) => {
@@ -212,14 +222,6 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
       }
       return next
     })
-  }
-
-  const handleResourceClick = (nodeId: string, event: React.MouseEvent) => {
-    event.stopPropagation()
-    const node = nodes.find((n) => n.id === nodeId)
-    const resource = node?.resources[0]
-    if (!resource) return
-    window.open(resource.url, '_blank')
   }
 
   /** Оптимистичный тоггл лайка дерева (с rollback при ошибке). */
@@ -479,6 +481,28 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
 
       <ProgressSidebar totalNodes={totalNodes} completedNodes={completedNodes} />
 
+      {/* Карточка выбранного навыка: описание, материалы, отметка пройденным. */}
+      {selectedNode && (
+        <div className="mt-4">
+          <NodeDetailsCard
+            node={selectedNode}
+            status={getNodeStatus(selectedNode, completedNodeIds)}
+            completedNodeIds={completedNodeIds}
+            isCompleted={completedNodeIds.has(selectedNode.id)}
+            blockedByTitle={blockedByTitle(selectedNode)}
+            unlockHint={
+              completedNodeIds.has(selectedNode.id)
+                ? 'Навык засчитан в прогресс и streak.'
+                : unlockCountFor(selectedNode.id) > 0
+                  ? `Отметка пройденным откроет ${unlockCountFor(selectedNode.id)} след. навык(ов).`
+                  : 'Отметка пройденным засчитает навык.'
+            }
+            onToggle={(completed) => handleToggleProgress(selectedNode.id, completed)}
+            onClose={() => setSelectedNodeId(null)}
+          />
+        </div>
+      )}
+
       {/* Список навыков по статусам: названия видны всегда, заблокированные — с причиной. */}
       <div className="mt-4 space-y-4">
         {statusGroups.map(
@@ -593,14 +617,7 @@ export function SkillTreePage({ treeId }: { treeId: string }) {
               edges={edges}
               completedNodeIds={completedNodeIds}
               onNodeClick={handleNodeSelect}
-              onResourceClick={handleResourceClick}
               selectedNodeId={selectedNodeId}
-              onSelectNode={setSelectedNodeId}
-              onToggleProgress={handleToggleProgress}
-              getBlockedByTitle={(nodeId) => {
-                const node = nodes.find((n) => n.id === nodeId)
-                return node ? blockedByTitle(node) : null
-              }}
             />
           </div>
           {/* Обсуждение под просмотром дерева (скрыто в редакторе). */}
