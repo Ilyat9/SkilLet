@@ -235,7 +235,7 @@
 
   /* Числовые метки (сложность узлов, счётчики) — типографская литера. */
   .font-stamp {
-    font-family: var(--font-mono), ui-monospace, monospace;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
     font-size: 0.9em;
     letter-spacing: 0.02em;
   }
