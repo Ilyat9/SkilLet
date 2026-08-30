@@ -21,17 +21,22 @@ export function EditorNodeView({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'relative w-56 p-4 border-2 rounded-lg shadow-lg bg-card',
+        'relative w-56 p-4 border shadow-sm bg-card',
+        'rounded-[10px_13px_9px_12px]',
         selected ? 'border-accent-strong ring-2 ring-accent/40' : 'border-border'
       )}
       aria-label={`Навык «${nodeData.title}»`}
     >
+      {/* Сложность — пометка-число в углу (как на узлах дерева). */}
+      <span className="font-stamp absolute top-2 right-2.5 text-xs text-muted-foreground" aria-hidden>
+        {nodeData.difficulty}/10
+      </span>
       <Handle type="target" position={Position.Top} className="!bg-primary" />
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-start gap-2 mb-2 pr-8">
         {nodeData.resourceType === 'video' ? (
-          <Video className="w-4 h-4 text-primary shrink-0" aria-hidden />
+          <Video className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
         ) : nodeData.resourceType === 'article' ? (
-          <FileText className="w-4 h-4 text-primary shrink-0" aria-hidden />
+          <FileText className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
         ) : null}
         <h4 className="font-semibold text-sm text-foreground line-clamp-2">{nodeData.title}</h4>
       </div>
@@ -40,13 +45,16 @@ export function EditorNodeView({ data, selected }: NodeProps) {
         <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{nodeData.description}</p>
       )}
 
-      <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-muted-foreground">Сложность: {nodeData.difficulty}/10</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+      {/* Штриховка сложности слева направо — как на узлах дерева просмотра. */}
+      <div aria-hidden className="relative h-2.5 border border-border/70 overflow-hidden rounded-[2px]">
         <div
-          className="h-full rounded-full bg-primary"
-          style={{ width: `${Math.max(0, Math.min(100, nodeData.difficulty * 10))}%` }}
+          className="h-full"
+          style={{
+            width: `${Math.max(0, Math.min(100, nodeData.difficulty * 10))}%`,
+            color: 'hsl(var(--accent-strong) / 0.85)',
+            backgroundImage:
+              'repeating-linear-gradient(135deg, currentColor 0, currentColor 1px, transparent 1px, transparent 4px)',
+          }}
         />
       </div>
       <Handle type="source" position={Position.Bottom} className="!bg-primary" />

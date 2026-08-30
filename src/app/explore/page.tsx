@@ -239,17 +239,18 @@ export default function ExplorePage() {
         </div>
 
         {isLoading ? (
-          /* Skeleton карточек вместо спиннера. */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" role="status" aria-label="Загрузка каталога">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="bg-card border border-border rounded-lg p-6 space-y-4 animate-pulse">
-                <div className="flex items-start justify-between">
-                  <div className="h-6 w-32 rounded bg-muted" />
-                  <div className="h-4 w-20 rounded bg-muted" />
-                </div>
-                <div className="space-y-2">
+          /* Skeleton записей каталога (строки ledger, не карточки). */
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12" role="status" aria-label="Загрузка каталога">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-5 py-5 border-b border-border/60 animate-pulse">
+                <div className="flex-1 space-y-3">
+                  <div className="h-5 w-40 rounded bg-muted" />
                   <div className="h-3 w-full rounded bg-muted" />
-                  <div className="h-3 w-3/4 rounded bg-muted" />
+                  <div className="h-3 w-2/3 rounded bg-muted" />
+                </div>
+                <div className="w-36 shrink-0 border-l border-border/60 pl-4 space-y-2">
+                  <div className="h-4 w-16 rounded bg-muted" />
+                  <div className="h-3 w-20 rounded bg-muted" />
                 </div>
               </div>
             ))}
@@ -269,13 +270,16 @@ export default function ExplorePage() {
           )
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Разворот бестиария: записи в две колонки, метаданные на полях
+                каждой записи (см. TreeCard variant="ledger"). Не grid 3xN. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 items-start">
               {trees.items.map((tree) => (
                 <TreeCard
                   key={tree.id}
                   tree={tree}
                   isPublic
                   canLike
+                  variant="ledger"
                   onToggleLike={(t) => void toggleLike(t)}
                   onSelect={() => router.push(`/tree/${tree.id}`)}
                 />

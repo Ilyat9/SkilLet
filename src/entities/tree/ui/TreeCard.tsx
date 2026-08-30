@@ -15,9 +15,15 @@ interface TreeCardProps {
   onToggleLike?: (tree: Tree) => void
   /** Пользователь авторизован? (неавторизованный клик по лайку → редирект на вход). */
   canLike?: boolean
+  /**
+   * card — обычная карточка (дашборд, рекомендации);
+   * ledger — строка-запись каталога с колонкой метаданных на полях
+   * (разворот бестиария, не grid 3xN одинаковых карточек).
+   */
+  variant?: 'card' | 'ledger'
 }
 
-export function TreeCard({ tree, isPublic, onExplore, onSelect, onToggleLike, canLike = false }: TreeCardProps) {
+export function TreeCard({ tree, isPublic, onExplore, onSelect, onToggleLike, canLike = false, variant = 'card' }: TreeCardProps) {
   const action = onSelect ?? onExplore
 
   // Enter/Space активируют карточку с клавиатуры так же, как клик.
@@ -46,6 +52,98 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect, onToggleLike, ca
   const likeLabel = tree.likedByMe
     ? `Убрать лайк с дерева «${tree.title}»`
     : `Поставить лайк дереву «${tree.title}»`
+
+  if (variant === 'ledger') {
+    // Запись каталога: текст записи слева, метаданные — узкая колонка
+    // на полях справа, отделённая волосяной линейкой. Как разворот бестиария:
+    // описание существа и его «измерения», вынесенные в маргиналии.
+    return (
+      <div
+        className={cn(
+          'group flex gap-5 -mx-3 px-3 py-5 border-b border-border/60 first:border-t',
+          'hover:bg-card/60 transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
+          {
+            'cursor-pointer': Boolean(action),
+            'cursor-default': !action,
+          }
+        )}
+        onClick={action}
+        onKeyDown={handleKeyDown}
+        {...(action ? { role: 'button', tabIndex: 0 } : {})}
+        aria-label={`Дерево «${tree.title}»${tree._count?.nodes ? `, ${tree._count.nodes} навыков` : ''}${isPublic ? ', публичное' : ', приватное'}`}
+      >
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-semibold text-foreground leading-snug">{tree.title}</h3>
+          {tree.author && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              задокументировал {tree.author.name || 'Unknown'}
+            </p>
+          )}
+          {tree.description && (
+            <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{tree.description}</p>
+          )}
+        </div>
+
+        <dl className="w-36 shrink-0 border-l border-border/60 pl-4 pt-0.5 space-y-2 text-xs text-muted-foreground">
+          <div>
+            <dt className="sr-only">Доступ</dt>
+            <dd>
+              <Badge variant={isPublic ? 'success' : 'warning'}>{isPublic ? 'Публичное' : 'Приватное'}</Badge>
+            </dd>
+          </div>
+          {tree.category && (
+            <div>
+              <dt className="text-text-tertiary/80">Раздел</dt>
+              <dd className="text-foreground">{TREE_CATEGORY_LABELS[tree.category]}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-text-tertiary/80">Навыков</dt>
+            <dd className="font-stamp text-foreground">{tree._count?.nodes || 0}</dd>
+          </div>
+          {tree.difficultyStats && tree.difficultyStats.max > 0 && (
+            <div title={`Сложность узлов: от ${tree.difficultyStats.min} до ${tree.difficultyStats.max}`}>
+              <dt className="text-text-tertiary/80">Средняя сложность</dt>
+              <dd className="font-stamp text-foreground">~{tree.difficultyStats.avg}</dd>
+            </div>
+          )}
+          <div className="flex items-center gap-3 pt-0.5">
+            {onToggleLike && canLike ? (
+              <button
+                type="button"
+                onClick={handleLike}
+                onKeyDown={handleLikeKeyDown}
+                aria-pressed={Boolean(tree.likedByMe)}
+                aria-label={likeLabel}
+                className={cn(
+                  'flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-xs transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                  tree.likedByMe
+                    ? 'border-destructive text-destructive bg-destructive/10'
+                    : 'border-border text-muted-foreground hover:text-destructive hover:border-destructive/50'
+                )}
+              >
+                <Heart className={cn('w-3.5 h-3.5', tree.likedByMe && 'fill-current')} aria-hidden />
+                {tree._count?.likes ?? 0}
+              </button>
+            ) : (
+              <span className="flex items-center gap-1" title="Лайки сообщества">
+                <Heart className="w-3.5 h-3.5" aria-hidden />
+                <span className="font-stamp">{tree._count?.likes ?? 0}</span>
+              </span>
+            )}
+            {(tree._count?.progresses ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 text-warning" title="Сколько раз узлы дерева отмечены пройденными">
+                <Flame className="w-3.5 h-3.5" aria-hidden />
+                <span className="font-stamp">{tree._count?.progresses}</span>
+              </span>
+            )}
+          </div>
+        </dl>
+      </div>
+    )
+  }
 
   return (
     <div

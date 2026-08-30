@@ -5,6 +5,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   MiniMap,
   Controls,
   Panel,
@@ -16,6 +17,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { CustomNode, type CustomFlowNode, type CustomNodeData } from './CustomNode'
+import { RouteEdge } from './RouteEdge'
 import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
 import type { Node as AppNode, Resource } from '@/entities/node/model/types'
 import { NODE_STATUS_CONFIG, NODE_STATUS_ORDER, type NodeStatus } from '@/shared/constants'
@@ -26,6 +28,7 @@ import type { Edge as PrismaEdge } from '@prisma/client'
 type FlowNode = CustomFlowNode
 
 const nodeTypes = { custom: CustomNode }
+const edgeTypes = { route: RouteEdge }
 
 interface SkillTreeViewerProps {
   nodes: AppNode[]
@@ -116,19 +119,16 @@ export function SkillTreeViewer({
         ...(horizontal
           ? { sourceHandle: 'source-right', targetHandle: 'target-left' }
           : { sourceHandle: 'source-bottom', targetHandle: 'target-top' }),
-        type: 'smoothstep',
+        type: 'route',
         // Направление связи — ключевая семантика графа: стрелка = «нужно пройти
-        // источник, чтобы открыть цель» (getNodeStatus). Явный усиленный маркер
-        // и цвет делают направление считываемым с одного взгляда.
+        // источник, чтобы открыть цель» (getNodeStatus). Маркер маленький и
+        // незаметный: направление считывается, но маршрут не превращается
+        // обратно в flowchart со стрелками.
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          width: 22,
-          height: 22,
+          width: 14,
+          height: 14,
           color: 'hsl(var(--accent-strong))',
-        },
-        style: {
-          stroke: 'hsl(var(--border))',
-          strokeWidth: 2,
         },
       }
     })
@@ -145,6 +145,7 @@ export function SkillTreeViewer({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           minZoom={0.3}
           maxZoom={1.5}
           onInit={handleInit}
@@ -153,7 +154,11 @@ export function SkillTreeViewer({
           elementsSelectable={false}
           proOptions={{ hideAttribution: true }}
         >
-          <Background />
+          <Background
+            variant={BackgroundVariant.Lines}
+            gap={56}
+            color="hsl(var(--border) / 0.35)"
+          />
           {/* Без props MiniMap/Controls рендерятся в дефолтной светлой теме ReactFlow
               (белая заливка) — на тёмной теме выглядят как белый артефакт. */}
           <MiniMap
@@ -175,7 +180,7 @@ export function SkillTreeViewer({
                   return (
                     <div key={status} className="flex items-center gap-2">
                       {/* Образец берёт классы прямо из NODE_STATUS_CONFIG — как сами узлы. */}
-                      <div className={cn('w-3 h-3 border-2 rounded bg-card', config.color)} aria-hidden />
+                      <div className={cn('w-3 h-3 border bg-card', config.color)} aria-hidden />
                       <span>
                         {config.label.charAt(0).toUpperCase() + config.label.slice(1)}
                       </span>
