@@ -185,7 +185,18 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
         defaultEdgeOptions={{ type: 'smoothstep' }}
       >
         <Background />
-        <MiniMap />
+        {/* Без props MiniMap рендерится в дефолтной светлой теме ReactFlow
+            (белая заливка) — на тёмной теме выглядит как белый артефакт.
+            Стилизация как в SkillTreeViewer. */}
+        <MiniMap
+          pannable
+          zoomable
+          style={{ width: 112, height: 72 }}
+          bgColor="hsl(var(--card))"
+          nodeColor="hsl(var(--muted))"
+          nodeStrokeColor="hsl(var(--border))"
+          maskColor="hsl(var(--background) / 0.75)"
+        />
         <Controls />
       </ReactFlow>
 
