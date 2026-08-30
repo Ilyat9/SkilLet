@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/shared/ui/Button'
 import { Logo } from '@/shared/ui/Logo'
+import treePreview from '../../public/tree-preview.png'
 
 export default function Home() {
   return (
@@ -28,6 +30,25 @@ export default function Home() {
               <Link href="/explore">Открыть каталог</Link>
             </Button>
           </div>
+
+          {/* Сам продукт, а не рассказ о нём: живой экран дерева в двойной
+              переплётной рамке (та же геометрия, что у экслибриса-логотипа).
+              Светлый снимок в рамке читается как вложенная карта на обеих темах. */}
+          <figure className="mb-14 max-w-3xl mx-auto">
+            <div className="border border-border bg-card p-2 shadow-sm">
+              <div className="border border-border/60 p-1">
+                <Image
+                  src={treePreview}
+                  alt="Экран дерева навыков: доступный узел с пометкой сложности, пунктирные рёбра ведут к заблокированным узлам"
+                  className="w-full h-auto"
+                  priority
+                />
+              </div>
+            </div>
+            <figcaption className="text-xs text-muted-foreground mt-2">
+              Дерево навыков: пунктир — ещё не нанесено на карту, засечки на рёбрах — вехи маршрута
+            </figcaption>
+          </figure>
 
           <div className="text-left max-w-xl mx-auto divide-y divide-border">
             <div className="py-5">
