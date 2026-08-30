@@ -37,7 +37,11 @@ export function CustomNode({ id, data }: NodeProps<CustomFlowNode>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} isConnectable={false} className="!opacity-0" />
+      {/* Четыре ручки: вертикальные связи (bottom→top) и горизонтальные
+          (right→left) для раскладок слева-направо. Сторону выбирает
+          SkillTreeViewer per-edge по взаимному положению узлов. */}
+      <Handle id="target-top" type="target" position={Position.Top} isConnectable={false} className="!opacity-0" />
+      <Handle id="target-left" type="target" position={Position.Left} isConnectable={false} className="!opacity-0" />
       <SkillNode
         node={node}
         status={data.status}
@@ -45,7 +49,8 @@ export function CustomNode({ id, data }: NodeProps<CustomFlowNode>) {
         onNodeClick={data.onNodeClick}
         onResourceClick={data.onResourceClick}
       />
-      <Handle type="source" position={Position.Bottom} isConnectable={false} className="!opacity-0" />
+      <Handle id="source-bottom" type="source" position={Position.Bottom} isConnectable={false} className="!opacity-0" />
+      <Handle id="source-right" type="source" position={Position.Right} isConnectable={false} className="!opacity-0" />
     </>
   )
 }

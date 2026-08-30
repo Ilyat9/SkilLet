@@ -1,6 +1,10 @@
 /**
- * Разовая пересборка раскладки AI-дерева в проде (слои по графу рёбер).
- * Запуск: node --env-file=.env.neon.local scripts/relayout-tree.mjs <treeId>
+ * Разовая пересборка раскладки дерева в проде (слои по графу рёбер).
+ * Глубокие узкие деревья (цепочки слоёв по 1–2 узла) раскладываются
+ * слева-направо, широкие — сверху-вниз. Тот же алгоритм, что в
+ * src/app/api/ai/generate/route.ts (layoutAiNodes).
+ *
+ * Запуск: DATABASE_URL=<direct-строка> node scripts/relayout-tree.mjs <treeId>
  */
 import { PrismaClient } from '@prisma/client'
 
@@ -10,6 +14,8 @@ const treeId = process.argv[2]
 const MAX_COLS = 8
 const STEP_X = 250
 const STEP_Y = 220
+const STEP_COL = 340
+const STEP_ROW_H = 240
 
 const tree = await prisma.tree.findUnique({
   where: { id: treeId },
@@ -47,23 +53,41 @@ layer.forEach((l, i) => {
   byLayer.get(l).push(i)
 })
 
-let yCursor = 0
+const layers = [...byLayer.keys()].sort((a, b) => a - b)
+const depth = layers.length
+const widestRow = Math.max(...layers.map((l) => Math.ceil((byLayer.get(l) ?? []).length / MAX_COLS)))
+const horizontal = depth >= 5 && widestRow <= 2
+
 const updates = []
-for (const l of [...byLayer.keys()].sort((a, b) => a - b)) {
-  const idxs = byLayer.get(l)
-  for (let rs = 0; rs < idxs.length; rs += MAX_COLS) {
-    const row = idxs.slice(rs, rs + MAX_COLS)
-    const offset = ((row.length - 1) / 2) * STEP_X
-    row.forEach((idx, col) => {
+if (horizontal) {
+  for (const l of layers) {
+    const idxs = byLayer.get(l)
+    const offset = ((idxs.length - 1) / 2) * STEP_ROW_H
+    idxs.forEach((idx, row) => {
       updates.push(prisma.node.update({
         where: { id: tree.nodes[idx].id },
-        data: { positionX: col * STEP_X - offset, positionY: yCursor },
+        data: { positionX: l * STEP_COL, positionY: row * STEP_ROW_H - offset },
       }))
     })
-    yCursor += STEP_Y
+  }
+} else {
+  let yCursor = 0
+  for (const l of layers) {
+    const idxs = byLayer.get(l)
+    for (let rs = 0; rs < idxs.length; rs += MAX_COLS) {
+      const row = idxs.slice(rs, rs + MAX_COLS)
+      const offset = ((row.length - 1) / 2) * STEP_X
+      row.forEach((idx, col) => {
+        updates.push(prisma.node.update({
+          where: { id: tree.nodes[idx].id },
+          data: { positionX: col * STEP_X - offset, positionY: yCursor },
+        }))
+      })
+      yCursor += STEP_Y
+    }
   }
 }
 
 await prisma.$transaction(updates)
-console.log(`relayout ok: ${updates.length} nodes, layers=${byLayer.size}`)
+console.log(`relayout ok: ${updates.length} nodes, layers=${byLayer.size}, orientation=${horizontal ? 'horizontal' : 'vertical'}`)
 await prisma.$disconnect()

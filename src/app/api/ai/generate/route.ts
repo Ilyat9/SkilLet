@@ -168,16 +168,36 @@ function layoutAiNodes(nodes: AiTreeResponse['nodes'], edges: readonly DagEdge[]
   })
 
   const result: { x: number; y: number }[] = nodes.map(() => ({ x: 0, y: 0 }))
+  const layers = [...byLayer.keys()].sort((a, b) => a - b)
+  // Глубокое узкое дерево (цепочка слоёв по 1–2 узла) в вертикальной раскладке
+  // превращается в длинную колонку — fitView отдаляет до нечитаемости.
+  // Такие деревья раскладываем слева-направо, как классические skill-roadmap'ы.
+  const depth = layers.length
+  const widestRow = Math.max(...layers.map((l) => Math.ceil((byLayer.get(l) ?? []).length / MAX_COLS)))
+  const horizontal = depth >= 5 && widestRow <= 2
+  const STEP_COL = 340
+  const STEP_ROW_H = 240
+
   let yCursor = 0
-  for (const l of [...byLayer.keys()].sort((a, b) => a - b)) {
-    const idxs = byLayer.get(l) ?? []
-    for (let rowStart = 0; rowStart < idxs.length; rowStart += MAX_COLS) {
-      const row = idxs.slice(rowStart, rowStart + MAX_COLS)
-      const offset = ((row.length - 1) / 2) * STEP_X
-      row.forEach((nodeIdx, col) => {
-        result[nodeIdx] = { x: col * STEP_X - offset, y: yCursor }
+  if (horizontal) {
+    for (const l of layers) {
+      const idxs = byLayer.get(l) ?? []
+      const offset = ((idxs.length - 1) / 2) * STEP_ROW_H
+      idxs.forEach((nodeIdx, row) => {
+        result[nodeIdx] = { x: l * STEP_COL, y: row * STEP_ROW_H - offset }
       })
-      yCursor += STEP_Y
+    }
+  } else {
+    for (const l of layers) {
+      const idxs = byLayer.get(l) ?? []
+      for (let rowStart = 0; rowStart < idxs.length; rowStart += MAX_COLS) {
+        const row = idxs.slice(rowStart, rowStart + MAX_COLS)
+        const offset = ((row.length - 1) / 2) * STEP_X
+        row.forEach((nodeIdx, col) => {
+          result[nodeIdx] = { x: col * STEP_X - offset, y: yCursor }
+        })
+        yCursor += STEP_Y
+      }
     }
   }
   return result

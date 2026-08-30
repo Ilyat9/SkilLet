@@ -51,7 +51,7 @@ export const MAX_NODES_PER_TREE = 100
 export const MAX_EDGES_PER_TREE = 400
 
 /** Границы координат узлов — должны совпадать с ограничениями NodeSchema (zod). */
-export const NODE_POSITION_LIMIT = 1000
+export const NODE_POSITION_LIMIT = 3000
 
 /**
  * Категории деревьев (Prisma enum TreeCategory). ЕДИНСТВЕННЫЙ источник списка:

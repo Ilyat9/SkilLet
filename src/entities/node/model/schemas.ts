@@ -25,8 +25,8 @@ export function parseResources(value: unknown): Resource[] {
 export const NodeSchema = z.object({
   title: z.string().min(1, 'Название обязательно').max(200, 'Слишком длинное название'),
   description: z.string().max(1000, 'Слишком длинное описание').optional(),
-  positionX: z.number().min(-1000).max(1000),
-  positionY: z.number().min(-1000).max(1000),
+  positionX: z.number().min(-3000).max(3000),
+  positionY: z.number().min(-3000).max(3000),
   difficulty: z.number().int().min(1).max(10),
   resourceType: z.enum(['video', 'article']).optional(),
   resourceUrl: z.string().url('Некорректный URL').optional(),

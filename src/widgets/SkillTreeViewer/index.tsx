@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -12,6 +12,7 @@ import {
   useEdgesState,
   MarkerType,
   type Edge,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { CustomNode, type CustomFlowNode, type CustomNodeData } from './CustomNode'
@@ -142,29 +143,60 @@ export function SkillTreeViewer({
     setReactFlowNodes(flowNodes)
   }, [flowNodes, setReactFlowNodes])
 
+  // Стартовый вьюпорт: не fitView всего графа (большие деревья отдаляются до
+  // нечитаемости), а зум 0.65 с центром на первом доступном узле — как в
+  // классических roadmap-сервисах: вход в кадр читаемый, дальше — пан/зум.
+  const handleInit = useCallback((instance: ReactFlowInstance<FlowNode, Edge>) => {
+    const el = document.querySelector<HTMLElement>('.react-flow')
+    const w = el?.clientWidth ?? 1000
+    const h = el?.clientHeight ?? 600
+    const target =
+      nodes.find((n) => getNodeStatus(n, completedNodeIds) === 'available') ?? nodes[0]
+    if (!target) return
+    const zoom = 0.65
+    instance.setViewport({
+      x: w / 2 - target.positionX * zoom,
+      y: h / 2 - target.positionY * zoom,
+      zoom,
+    })
+    // Начальный центрирующий эффект — выполнится один раз при инициализации flow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
-    const edgeConnections: Edge[] = edges.map((edge) => ({
-      id: edge.id,
-      source: edge.sourceId,
-      target: edge.targetId,
-      type: 'smoothstep',
-      // Направление связи — ключевая семантика графа: стрелка = «нужно пройти
-      // источник, чтобы открыть цель» (getNodeStatus). Явный усиленный маркер
-      // и цвет делают направление считываемым с одного взгляда.
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 22,
-        height: 22,
-        color: 'hsl(var(--accent-strong))',
-      },
-      style: {
-        stroke: 'hsl(var(--border))',
-        strokeWidth: 2,
-      },
-    }))
+    // Стороны ручек выбираем по взаимному положению узлов: цель правее источника
+    // (горизонтальная раскладка) — связь right→left, иначе классически bottom→top.
+    const posById = new Map(nodes.map((n) => [n.id, { x: n.positionX, y: n.positionY }]))
+    const edgeConnections: Edge[] = edges.map((edge) => {
+      const from = posById.get(edge.sourceId)
+      const to = posById.get(edge.targetId)
+      const horizontal = from !== undefined && to !== undefined && Math.abs(to.x - from.x) > Math.abs(to.y - from.y)
+      return {
+        id: edge.id,
+        source: edge.sourceId,
+        target: edge.targetId,
+        ...(horizontal
+          ? { sourceHandle: 'source-right', targetHandle: 'target-left' }
+          : { sourceHandle: 'source-bottom', targetHandle: 'target-top' }),
+        type: 'smoothstep',
+        // Направление связи — ключевая семантика графа: стрелка = «нужно пройти
+        // источник, чтобы открыть цель» (getNodeStatus). Явный усиленный маркер
+        // и цвет делают направление считываемым с одного взгляда.
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 22,
+          height: 22,
+          color: 'hsl(var(--accent-strong))',
+        },
+        style: {
+          stroke: 'hsl(var(--border))',
+          strokeWidth: 2,
+        },
+      }
+    })
 
     setReactFlowEdges(edgeConnections)
-  }, [edges, setReactFlowEdges])
+  }, [edges, nodes, setReactFlowEdges])
 
   return (
     <div className="w-full h-full">
@@ -175,7 +207,9 @@ export function SkillTreeViewer({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
-          fitView
+          minZoom={0.3}
+          maxZoom={1.5}
+          onInit={handleInit}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
