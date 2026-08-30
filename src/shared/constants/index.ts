@@ -21,7 +21,7 @@ export const NODE_STATUS_CONFIG: Record<
   { color: string; textColor: string; icon: string; label: string; overlay: string }
 > = {
   [NODE_STATUS.LOCKED]: {
-    color: 'border-border border-dashed bg-transparent',
+    color: 'border-border border-dashed bg-card',
     textColor: 'text-muted-foreground',
     icon: '',
     label: 'заблокирован',
