@@ -149,13 +149,13 @@ export default function ProfilePage() {
   // арканы-круги, сигилы, тёмное стекло; фон — тёмные тона темы.
   const avatarSeed = encodeURIComponent(profile.user.email ?? profile.user.name ?? 'user')
   const avatarOptions = [
-    { label: 'Аркан', url: `https://api.dicebear.com/9.x/rings/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
-    { label: 'Сигил', url: `https://api.dicebear.com/9.x/shapes/svg?seed=${avatarSeed}&backgroundColor=221a14` },
-    { label: 'Призма', url: `https://api.dicebear.com/9.x/glass/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
+    { label: 'Аркан', url: `https://api.dicebear.com/9.x/rings/svg?seed=${avatarSeed}&backgroundColor=1c1712&ringColor=b08d57,d8c9b4,8c3b2e` },
+    { label: 'Печать', url: `https://api.dicebear.com/9.x/shapes/svg?seed=${avatarSeed}&backgroundColor=221a14&shape1Color=c9a227&shape2Color=8c3b2e&shape3Color=4e6e5d` },
+    { label: 'Скрипторий', url: `https://api.dicebear.com/9.x/notionists/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
     { label: 'Странник', url: `https://api.dicebear.com/9.x/adventurer/svg?seed=${avatarSeed}&backgroundColor=2a211a` },
     { label: 'Гравюра', url: `https://api.dicebear.com/9.x/lorelei/svg?seed=${avatarSeed}&backgroundColor=221a14` },
+    { label: 'Хроникёр', url: `https://api.dicebear.com/9.x/dylan/svg?seed=${avatarSeed}&backgroundColor=221a14` },
     { label: 'Пиксель', url: `https://api.dicebear.com/9.x/pixel-art/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
-    { label: 'Идентикон', url: `https://api.dicebear.com/9.x/identicon/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
     { label: 'Инициалы', url: `https://api.dicebear.com/9.x/initials/svg?seed=${avatarSeed}&backgroundColor=1c1712&textColor=d8c9b4` },
   ]
 
