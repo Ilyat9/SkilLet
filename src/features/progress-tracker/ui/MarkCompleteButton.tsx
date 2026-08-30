@@ -35,6 +35,8 @@ export function MarkCompleteButton({
 }: MarkCompleteButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isFailed, setIsFailed] = useState(false)
+  // Открытое подтверждение отката пройденного навыка.
+  const [isConfirmingRevert, setIsConfirmingRevert] = useState(false)
   const { data: session } = useAuth()
   const { showToast } = useToast()
 
@@ -79,12 +81,50 @@ export function MarkCompleteButton({
     }
   }
 
-  if (isCompleted) {
+  // Пройдено: клик открывает подтверждение отката (случайный клик не портит прогресс).
+  if (isCompleted && !isConfirmingRevert) {
     return (
-      <Badge variant="success" className="flex items-center gap-2">
-        <CheckCircle2 className="w-3 h-3" />
-        Пройдено
-      </Badge>
+      <Button
+        onClick={() => setIsConfirmingRevert(true)}
+        disabled={isLoading}
+        variant="secondary"
+        size="sm"
+        className="w-full text-success"
+      >
+        <CheckCircle2 className="w-4 h-4 mr-2" />
+        Пройдено — отменить?
+      </Button>
+    )
+  }
+
+  if (isCompleted && isConfirmingRevert) {
+    return (
+      <div role="alertdialog" aria-label="Подтверждение отката прогресса" className="rounded-md border border-warning/40 bg-warning/10 p-2.5">
+        <p className="text-xs text-foreground mb-2">
+          Откатить прогресс? Навыки, открытые этим, снова заблокируются.
+        </p>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleMarkComplete}
+            disabled={isLoading}
+            variant="ghost"
+            size="sm"
+            className="flex-1 text-destructive border border-destructive/40"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+            Да, откатить
+          </Button>
+          <Button
+            onClick={() => setIsConfirmingRevert(false)}
+            disabled={isLoading}
+            variant="ghost"
+            size="sm"
+            className="flex-1"
+          >
+            Отмена
+          </Button>
+        </div>
+      </div>
     )
   }
 
