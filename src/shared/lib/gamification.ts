@@ -2,7 +2,15 @@
  * Чистая бизнес-логика геймификации: streak и достижения.
  * Файл не зависит от рантайма (Prisma/Next) — используется и на сервере
  * (проверка достижений в API), и в тестах, и сидированием каталога.
+ * Иконки достижений — lucide-компоненты (данные для UI), на сервере
+ * они только передаются, но не рендерятся.
  */
+import type { LucideIcon } from 'lucide-react'
+import {
+  Footprints, TreeDeciduous, Route, Hammer, Network, Flame, Compass,
+  MessageSquare, Heart, BookOpen, Target, Moon, Award,
+} from 'lucide-react'
+
 
 export const ACHIEVEMENT_CODES = {
   FIRST_STEPS: 'first-steps',
@@ -26,7 +34,8 @@ export interface AchievementDef {
   code: AchievementCode
   title: string
   description: string
-  icon: string
+  /** Иконка достижения — компонент lucide, рендерится так же, как statCards профиля. */
+  icon: LucideIcon
   /** Секретные скрыты в профиле («Секретное достижение»), пока не получены. */
   secret?: boolean
 }
@@ -36,80 +45,80 @@ export const ACHIEVEMENT_DEFS: readonly AchievementDef[] = [
     code: ACHIEVEMENT_CODES.FIRST_STEPS,
     title: 'Первые шаги',
     description: 'Завершите первый узел любого дерева',
-    icon: '👣',
+    icon: Footprints,
   },
   {
     code: ACHIEVEMENT_CODES.TREE_COMPLETED,
     title: 'Дерево пройдено',
     description: 'Завершите все узлы одного дерева',
-    icon: '🌳',
+    icon: TreeDeciduous,
   },
   {
     code: ACHIEVEMENT_CODES.MARATHON,
     title: 'Марафонец',
     description: 'Завершите 20+ узлов суммарно по всем деревьям',
-    icon: '🏃',
+    icon: Route,
   },
   {
     code: ACHIEVEMENT_CODES.CREATOR,
     title: 'Создатель',
     description: 'Создайте собственное дерево с 5+ узлами',
-    icon: '🛠️',
+    icon: Hammer,
   },
   {
     code: ACHIEVEMENT_CODES.CONNECTOR,
     title: 'Архитектор связей',
     description: 'Создайте дерево с 10+ связями без циклов',
-    icon: '🕸️',
+    icon: Network,
   },
   {
     code: ACHIEVEMENT_CODES.STREAK_WEEK,
     title: 'Огонь',
     description: 'Занимайтесь 7 дней подряд',
-    icon: '🔥',
+    icon: Flame,
   },
   {
     code: ACHIEVEMENT_CODES.EXPLORER,
     title: 'Исследователь',
     description: 'Начните 5 разных деревьев',
-    icon: '🧭',
+    icon: Compass,
   },
   {
     code: ACHIEVEMENT_CODES.VOICE,
     title: 'Голос сообщества',
     description: 'Оставьте 3 комментария к деревьям',
-    icon: '💬',
+    icon: MessageSquare,
   },
   {
     code: ACHIEVEMENT_CODES.FAVORITE,
     title: 'Любимец публики',
     description: 'Соберите 5 лайков на своих деревьях',
-    icon: '❤️',
+    icon: Heart,
   },
   {
     code: ACHIEVEMENT_CODES.CURATOR,
     title: 'Куратор',
     description: 'Создайте 3 собственных дерева',
-    icon: '📚',
+    icon: BookOpen,
   },
   {
     code: ACHIEVEMENT_CODES.CENTURION,
     title: 'Сотка',
     description: 'Завершите 100 узлов суммарно по всем деревьям',
-    icon: '💯',
+    icon: Target,
   },
   {
     code: ACHIEVEMENT_CODES.NIGHT_OWL,
     title: 'Ночная сова',
     description: 'Отметьте узел пройденным ночью',
-    icon: '🦉',
+    icon: Moon,
     secret: true,
   },
   {
     code: ACHIEVEMENT_CODES.PERFECTIONIST,
     title: 'Перфекционист',
     description: 'Полностью пройдите 3 дерева',
-    icon: '🎯',
+    icon: Award,
     secret: true,
   },
 ] as const

@@ -5,34 +5,9 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { invalidateProfileSummary } from '@/widgets/Header/useProfileSummary'
-import { ACHIEVEMENT_DEFS, ACHIEVEMENT_CODES, type AchievementDef } from '@/shared/lib/gamification'
+import { ACHIEVEMENT_DEFS, type AchievementDef } from '@/shared/lib/gamification'
 import { Badge } from '@/shared/ui/Badge'
-import {
-  Flame, CheckCircle2, TreePine, Trophy, Footprints, Flag, Hammer, Network,
-  Compass, MessageSquare, Heart, BookOpen, Hash, Moon, Target, Gift,
-  type LucideIcon,
-} from 'lucide-react'
-
-/**
- * Иконки достижений из открытого стока (lucide, MIT) вместо эмодзи.
- * Ключ — code достижения; эмодзи из ACHIEVEMENT_DEFS остаётся фолбэком
- * (его же видят тосты разблокировки).
- */
-const ACHIEVEMENT_ICONS: Partial<Record<string, LucideIcon>> = {
-  [ACHIEVEMENT_CODES.FIRST_STEPS]: Footprints,
-  [ACHIEVEMENT_CODES.TREE_COMPLETED]: TreePine,
-  [ACHIEVEMENT_CODES.MARATHON]: Flag,
-  [ACHIEVEMENT_CODES.CREATOR]: Hammer,
-  [ACHIEVEMENT_CODES.CONNECTOR]: Network,
-  [ACHIEVEMENT_CODES.STREAK_WEEK]: Flame,
-  [ACHIEVEMENT_CODES.EXPLORER]: Compass,
-  [ACHIEVEMENT_CODES.VOICE]: MessageSquare,
-  [ACHIEVEMENT_CODES.FAVORITE]: Heart,
-  [ACHIEVEMENT_CODES.CURATOR]: BookOpen,
-  [ACHIEVEMENT_CODES.CENTURION]: Hash,
-  [ACHIEVEMENT_CODES.NIGHT_OWL]: Moon,
-  [ACHIEVEMENT_CODES.PERFECTIONIST]: Target,
-}
+import { Flame, CheckCircle2, TreePine, Trophy, Gift } from 'lucide-react'
 
 interface ProfileApiResponse {
   user: {
@@ -289,15 +264,22 @@ export default function ProfilePage() {
                 >
                   <div className="flex items-start justify-between">
                     {isHiddenSecret ? (
+                      /* Секретное до разблокировки: нейтральная обёртка вместо
+                         иконки достижения — не спойлерим содержимое. */
                       <Gift className="w-6 h-6 text-text-tertiary" aria-hidden />
-                    ) : (() => {
-                      const Icon = ACHIEVEMENT_ICONS[def.code]
-                      return Icon ? (
-                        <Icon className={`w-6 h-6 ${unlocked ? 'text-accent-strong' : 'text-text-tertiary'}`} aria-hidden />
-                      ) : (
-                        <span className="text-2xl" aria-hidden>{def.icon}</span>
-                      )
-                    })()}
+                    ) : (
+                      /* Иконка из каталога достижений — компонент lucide
+                         (тот же паттерн, что и statCards выше). */
+                      (() => {
+                        const Icon = def.icon
+                        return (
+                          <Icon
+                            className={`w-6 h-6 ${unlocked ? 'text-accent-strong' : 'text-text-tertiary'}`}
+                            aria-hidden
+                          />
+                        )
+                      })()
+                    )}
                     {unlocked ? (
                       <Badge variant="success">Получено</Badge>
                     ) : (
