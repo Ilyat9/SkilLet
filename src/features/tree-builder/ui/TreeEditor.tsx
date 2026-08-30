@@ -169,11 +169,30 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
     [editor.nodes]
   )
 
+  // Стороны ручек рёбер — как в SkillTreeViewer: цель правее источника —
+  // ровный горизонтальный маршрут right→left, иначе bottom→top. Без этого
+  // все связи шли через верх/низ и огибали соседние карточки крюком.
+  const routedEdges = useMemo(() => {
+    const posById = new Map(editor.nodes.map((n) => [n.id, n.position]))
+    return editor.edges.map((edge) => {
+      const from = posById.get(edge.source)
+      const to = posById.get(edge.target)
+      const dx = from !== undefined && to !== undefined ? to.x - from.x : 0
+      const horizontal = dx > 24
+      return {
+        ...edge,
+        ...(horizontal
+          ? { sourceHandle: 'source-right', targetHandle: 'target-left' }
+          : { sourceHandle: 'source-bottom', targetHandle: 'target-top' }),
+      }
+    })
+  }, [editor.nodes, editor.edges])
+
   return (
     <div className="relative w-full h-full">
       <ReactFlow
         nodes={styledNodes}
-        edges={editor.edges}
+        edges={routedEdges}
         nodeTypes={nodeTypes}
         onNodesChange={editor.onNodesChange}
         onEdgesChange={editor.onEdgesChange}

@@ -105,13 +105,16 @@ export function SkillTreeViewer({
   }, [])
 
   useEffect(() => {
-    // Стороны ручек выбираем по взаимному положению узлов: цель правее источника
-    // (горизонтальная раскладка) — связь right→left, иначе классически bottom→top.
-    const posById = new Map(nodes.map((n) => [n.id, { x: n.positionX, y: n.positionY }]))
-    const edgeConnections: Edge[] = edges.map((edge) => {
-      const from = posById.get(edge.sourceId)
-      const to = posById.get(edge.targetId)
-      const horizontal = from !== undefined && to !== undefined && Math.abs(to.x - from.x) > Math.abs(to.y - from.y)
+      // Стороны ручек: цель правее источника — ровный горизонтальный маршрут
+      // right→left (Г-образный, с одним изгибом). Правило «по доминирующей оси»
+      // давало крюки: диагональные связи шли bottom→top и огибали карточки.
+      // Иначе (тот же столбец или связь назад) — классически bottom→top.
+      const posById = new Map(nodes.map((n) => [n.id, { x: n.positionX, y: n.positionY }]))
+      const edgeConnections: Edge[] = edges.map((edge) => {
+        const from = posById.get(edge.sourceId)
+        const to = posById.get(edge.targetId)
+        const dx = from !== undefined && to !== undefined ? to.x - from.x : 0
+        const horizontal = dx > 24
       return {
         id: edge.id,
         source: edge.sourceId,

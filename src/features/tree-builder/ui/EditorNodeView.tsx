@@ -31,7 +31,12 @@ export function EditorNodeView({ data, selected }: NodeProps) {
       <span className="font-stamp absolute top-2 right-2.5 text-xs text-muted-foreground" aria-hidden>
         {nodeData.difficulty}/10
       </span>
-      <Handle type="target" position={Position.Top} className="!bg-primary" />
+      {/* Четыре ручки: вертикальные связи (bottom→top) и горизонтальные
+          (right→left). Сторону выбирает TreeEditor per-edge по взаимному
+          положению узлов — так же, как SkillTreeViewer: диагональные связи
+          идут ровным Г-маршрутом, а не крюком вокруг карточек. */}
+      <Handle id="target-top" type="target" position={Position.Top} className="!bg-primary" />
+      <Handle id="target-left" type="target" position={Position.Left} className="!bg-primary" />
       <div className="flex items-start gap-2 mb-2 pr-8">
         {nodeData.resourceType === 'video' ? (
           <Video className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
@@ -57,7 +62,8 @@ export function EditorNodeView({ data, selected }: NodeProps) {
           }}
         />
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-primary" />
+      <Handle id="source-bottom" type="source" position={Position.Bottom} className="!bg-primary" />
+      <Handle id="source-right" type="source" position={Position.Right} className="!bg-primary" />
     </div>
   )
 }
