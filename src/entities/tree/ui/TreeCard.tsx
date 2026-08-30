@@ -4,7 +4,7 @@ import { Tree } from '../model/types'
 import { Badge } from '@/shared/ui/Badge'
 import { cn } from '@/shared/lib/utils'
 import { TREE_CATEGORY_LABELS } from '@/shared/constants'
-import { Lock, Unlock, User, Heart } from 'lucide-react'
+import { Lock, Unlock, User, Heart, Flame } from 'lucide-react'
 
 interface TreeCardProps {
   tree: Tree
@@ -93,7 +93,8 @@ export function TreeCard({ tree, isPublic, onExplore, onSelect, onToggleLike, ca
         </span>
         {(tree._count?.progresses ?? 0) > 0 && (
           <span className="text-warning text-sm flex items-center gap-1" title="Сколько раз узлы дерева отмечены пройденными">
-            🔥 {tree._count?.progresses}
+            <Flame className="w-4 h-4" aria-hidden />
+            <span className="font-stamp">{tree._count?.progresses}</span>
           </span>
         )}
         {/* Сложность: средняя по узлам (агрегат приходит из GET /api/trees). */}

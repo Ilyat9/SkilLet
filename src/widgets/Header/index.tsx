@@ -8,6 +8,7 @@ import { signOut } from 'next-auth/react'
 import { useProfileSummary } from './useProfileSummary'
 import { Button } from '@/shared/ui/Button'
 import { ThemeToggle } from '@/shared/ui/ThemeToggle'
+import { Logo } from '@/shared/ui/Logo'
 import { Flame, LogOut, Menu, X } from 'lucide-react'
 
 /** Иконка текущей серии дней рядом с профилем. Подтягивается один раз при маунте. */
@@ -83,9 +84,7 @@ export function Header() {
             href="/dashboard"
             className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">S</span>
-            </div>
+            <Logo className="h-8 w-8" />
             <span className="font-bold text-xl text-foreground">SkilLet</span>
           </Link>
 

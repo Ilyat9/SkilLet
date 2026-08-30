@@ -8,7 +8,7 @@ import { Button } from '@/shared/ui/Button'
 import { EmptyState } from '@/shared/ui/EmptyState'
 import { useAuth } from '@/features/auth/ui/useAuth'
 import { TREE_CATEGORIES, TREE_CATEGORY_LABELS, type TreeCategoryValue } from '@/shared/constants'
-import { Search, Compass, AlertTriangle, SearchX, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Compass, AlertTriangle, SearchX, ChevronLeft, ChevronRight, Flame, Clock } from 'lucide-react'
 
 type SortMode = 'newest' | 'popular'
 
@@ -144,22 +144,23 @@ export default function ExplorePage() {
           <div className="flex gap-2">
             {(
               [
-                { id: 'popular', label: '🔥 По популярности' },
-                { id: 'newest', label: '🕐 По дате' },
+                { id: 'popular', label: 'По популярности', Icon: Flame },
+                { id: 'newest', label: 'По дате', Icon: Clock },
               ] as const
-            ).map((option) => (
+            ).map(({ id, label, Icon }) => (
               <button
-                key={option.id}
+                key={id}
                 type="button"
-                onClick={() => changeSort(option.id)}
-                aria-pressed={sortMode === option.id}
+                onClick={() => changeSort(id)}
+                aria-pressed={sortMode === id}
                 className={`px-3 py-2 rounded-md text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  sortMode === option.id
+                  sortMode === id
                     ? 'border-primary text-primary'
                     : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {option.label}
+                <Icon className="w-3.5 h-3.5 mr-1.5 inline-block align-[-2px]" aria-hidden />
+                {label}
               </button>
             ))}
           </div>

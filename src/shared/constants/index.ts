@@ -9,8 +9,11 @@ export type NodeStatus = (typeof NODE_STATUS)[keyof typeof NODE_STATUS]
 /**
  * ЕДИНСТВЕННЫЙ источник правды для вида узла дерева.
  * color/textColor — семантические Tailwind-классы, привязанные к дизайн-токенам
- * темы (см. src/app/globals.css). Иконка — эмодзи-символ, одинаково читаемый
- * в обеих темах; label — человекочитаемое название статуса для aria-label и легенды.
+ * темы (см. src/app/globals.css). Иконка — исторический астрономический/
+ * алхимический символ (☿ процесс, ☉ завершение): это открытый символьный язык
+ * манускриптов, а не игровая иконография (никаких щитов/замков). Заблокированный
+ * узел без иконки — он «ещё не нанесён на карту» (пунктир, см. color).
+ * label — человекочитаемое название статуса для aria-label и легенды.
  * SkillNode, CustomNode и легенда в SkillTreeViewer берут значения только отсюда.
  */
 export const NODE_STATUS_CONFIG: Record<
@@ -18,23 +21,23 @@ export const NODE_STATUS_CONFIG: Record<
   { color: string; textColor: string; icon: string; label: string; overlay: string }
 > = {
   [NODE_STATUS.LOCKED]: {
-    color: 'border-border bg-card',
+    color: 'border-border border-dashed bg-transparent',
     textColor: 'text-muted-foreground',
-    icon: '🔒',
+    icon: '',
     label: 'заблокирован',
-    overlay: 'bg-muted/30',
+    overlay: '',
   },
   [NODE_STATUS.AVAILABLE]: {
     color: 'border-accent bg-card',
     textColor: 'text-accent-strong',
-    icon: '⚡',
+    icon: '☿',
     label: 'доступен',
     overlay: '',
   },
   [NODE_STATUS.DONE]: {
     color: 'border-success bg-card',
     textColor: 'text-success',
-    icon: '✓',
+    icon: '☉',
     label: 'пройден',
     overlay: 'bg-success/10',
   },

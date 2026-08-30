@@ -223,7 +223,7 @@ async function markNode(title) {
   }
   if (!target) {
     for (const n of nodes) {
-      if (!(await n.evaluate((el) => el.textContent || '')).includes('🔒')) { target = n; break }
+      if (!(await n.evaluate((el) => el.getAttribute('aria-label') || '')).includes('заблокирован')) { target = n; break }
     }
     target ??= nodes[0]
   }
