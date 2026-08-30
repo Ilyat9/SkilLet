@@ -145,16 +145,18 @@ export default function ProfilePage() {
   const effectiveAvatar = avatarUrl ?? profile.user.image
   // DiceBear — детерминированные генеративные SVG (не нейросеть, бесплатно).
   // Сид = email/имя пользователя, поэтому наборы у всех разные, но стабильные.
+  // Набор — под стилистику проекта (дарк-фэнтези / алхимия / манускрипт):
+  // арканы-круги, сигилы, тёмное стекло; фон — тёмные тона темы.
   const avatarSeed = encodeURIComponent(profile.user.email ?? profile.user.name ?? 'user')
   const avatarOptions = [
-    { label: 'Notionists', url: `https://api.dicebear.com/9.x/notionists/svg?seed=${avatarSeed}` },
-    { label: 'Open Peeps', url: `https://api.dicebear.com/9.x/open-peeps/svg?seed=${avatarSeed}` },
-    { label: 'Micah', url: `https://api.dicebear.com/9.x/micah/svg?seed=${avatarSeed}` },
-    { label: 'Big Smile', url: `https://api.dicebear.com/9.x/big-smile/svg?seed=${avatarSeed}` },
-    { label: 'Avataaars', url: `https://api.dicebear.com/9.x/avataaars/svg?seed=${avatarSeed}` },
-    { label: 'Personas', url: `https://api.dicebear.com/9.x/personas/svg?seed=${avatarSeed}` },
-    { label: 'Adventurer', url: `https://api.dicebear.com/9.x/adventurer/svg?seed=${avatarSeed}` },
-    { label: 'Инициалы', url: `https://api.dicebear.com/9.x/initials/svg?seed=${avatarSeed}` },
+    { label: 'Аркан', url: `https://api.dicebear.com/9.x/rings/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
+    { label: 'Сигил', url: `https://api.dicebear.com/9.x/shapes/svg?seed=${avatarSeed}&backgroundColor=221a14` },
+    { label: 'Призма', url: `https://api.dicebear.com/9.x/glass/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
+    { label: 'Странник', url: `https://api.dicebear.com/9.x/adventurer/svg?seed=${avatarSeed}&backgroundColor=2a211a` },
+    { label: 'Гравюра', url: `https://api.dicebear.com/9.x/lorelei/svg?seed=${avatarSeed}&backgroundColor=221a14` },
+    { label: 'Пиксель', url: `https://api.dicebear.com/9.x/pixel-art/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
+    { label: 'Идентикон', url: `https://api.dicebear.com/9.x/identicon/svg?seed=${avatarSeed}&backgroundColor=1c1712` },
+    { label: 'Инициалы', url: `https://api.dicebear.com/9.x/initials/svg?seed=${avatarSeed}&backgroundColor=1c1712&textColor=d8c9b4` },
   ]
 
   const statCards = [
@@ -176,7 +178,11 @@ export default function ProfilePage() {
               width={64}
               height={64}
               className="w-16 h-16 rounded-full"
-              unoptimized={effectiveAvatar.endsWith('.svg')}
+              /* Всегда без оптимизатора: DiceBear отдаёт SVG (URL заканчивается
+                 на /svg — проверка по расширению не срабатывала), а оптимизатор
+                 Next.js SVG по умолчанию отбивает — аватарка в профиле была
+                 битой. 64px оптимизировать нечего. */
+              unoptimized
             />
           ) : (
             <div className="w-16 h-16 rounded-full bg-card border border-border flex items-center justify-center text-2xl font-bold">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -21,6 +21,7 @@ import { RouteEdge } from './RouteEdge'
 import { getNodeStatus } from '@/entities/node/model/nodeHelpers'
 import type { Node as AppNode, Resource } from '@/entities/node/model/types'
 import { NODE_STATUS_CONFIG, NODE_STATUS_ORDER, type NodeStatus } from '@/shared/constants'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import type { Edge as PrismaEdge } from '@prisma/client'
 
@@ -52,6 +53,8 @@ export function SkillTreeViewer({
 }: SkillTreeViewerProps) {
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState<FlowNode>([])
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState<Edge>([])
+  // Легенда сворачивается, чтобы не закрывать граф на маленьких экранах.
+  const [isLegendOpen, setIsLegendOpen] = useState(true)
 
   // Пересобираем flow-узлы при изменении дерева ИЛИ прогресса — статусы обновятся.
   const flowNodes = useMemo(() => {
@@ -179,28 +182,47 @@ export function SkillTreeViewer({
           <Controls />
           <Panel position="top-left">
             <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-              <h3 className="font-semibold text-sm mb-2">Легенда</h3>
-              <div className="space-y-1 text-xs">
-                {NODE_STATUS_ORDER.map((status) => {
-                  const config = NODE_STATUS_CONFIG[status]
-                  return (
-                    <div key={status} className="flex items-center gap-2">
-                      {/* Образец берёт классы прямо из NODE_STATUS_CONFIG — как сами узлы. */}
-                      <div className={cn('w-3 h-3 border bg-card', config.color)} aria-hidden />
-                      <span>
-                        {config.label.charAt(0).toUpperCase() + config.label.slice(1)}
-                      </span>
-                    </div>
-                  )
-                })}
-                {/* Направление связей: единая семантика графа. */}
-                <div className="flex items-center gap-2 pt-1 border-t border-border mt-1">
-                  <span aria-hidden className="text-accent-strong font-bold">→</span>
-                  <span className="text-muted-foreground">
-                    пройди источник — откроется цель
-                  </span>
-                </div>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <h3 className="font-semibold text-sm">Легенда</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsLegendOpen((v) => !v)}
+                  aria-expanded={isLegendOpen}
+                  aria-controls="tree-legend-content"
+                  aria-label={isLegendOpen ? 'Свернуть легенду' : 'Развернуть легенду'}
+                  title={isLegendOpen ? 'Свернуть' : 'Развернуть'}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {isLegendOpen ? (
+                    <ChevronUp className="w-4 h-4" aria-hidden />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" aria-hidden />
+                  )}
+                </button>
               </div>
+              {isLegendOpen && (
+                <div id="tree-legend-content" className="space-y-1 text-xs">
+                  {NODE_STATUS_ORDER.map((status) => {
+                    const config = NODE_STATUS_CONFIG[status]
+                    return (
+                      <div key={status} className="flex items-center gap-2">
+                        {/* Образец берёт классы прямо из NODE_STATUS_CONFIG — как сами узлы. */}
+                        <div className={cn('w-3 h-3 border bg-card', config.color)} aria-hidden />
+                        <span>
+                          {config.label.charAt(0).toUpperCase() + config.label.slice(1)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  {/* Направление связей: единая семантика графа. */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-border mt-1">
+                    <span aria-hidden className="text-accent-strong font-bold">→</span>
+                    <span className="text-muted-foreground">
+                      пройди источник — откроется цель
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </Panel>
         </ReactFlow>

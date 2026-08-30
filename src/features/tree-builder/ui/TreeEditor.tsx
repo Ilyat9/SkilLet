@@ -226,7 +226,7 @@ function TreeEditorInner({ treeId, initialNodes, initialEdges, onExit, onChanged
             <Plus className="w-4 h-4 mr-1" />
             Добавить узел
           </Button>
-          <Button size="sm" variant="ghost" onClick={editor.fitView}>
+          <Button size="sm" variant="secondary" onClick={editor.fitView}>
             Вписать
           </Button>
           <Button size="sm" variant="secondary" onClick={onExit}>
