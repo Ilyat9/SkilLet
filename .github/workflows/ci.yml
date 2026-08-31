@@ -53,6 +53,11 @@ jobs:
             --shadow-database-url "$SHADOW_DATABASE_URL" \
             --exit-code
 
+      - name: Generate Next types
+        # next-env.d.ts в .gitignore и генерируется Next'ом; без него tsc не
+        # знает типы для импорта картинок (*.png) — падает TS2307 на лендинге.
+        run: npx next typegen
+
       - name: Typecheck
         run: npx tsc --noEmit
 
