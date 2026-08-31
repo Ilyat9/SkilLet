@@ -20,7 +20,7 @@ import { join } from 'node:path'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000'
 const GIF = process.env.GIF_OUT ?? 'docs/assets/demo.gif'
-const FPS = Number(process.env.FPS ?? 12)
+const FPS = Number(process.env.FPS ?? 14)
 const WEBM = join(tmpdir(), 'skillet-demo.webm')
 
 function findChrome() {
@@ -137,12 +137,32 @@ const toCursor = (x, y) =>
 const clickRipple = (x, y) =>
   page.evaluate(({ x, y }) => { window.__ripple?.(x, y) }, { x, y })
 
+// Плавность: все движения по ease-in-out (разгон → торможение), скролл —
+// инкрементальными шагами вместо мгновенных прыжков колеса.
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
+let mouseX = 0
+let mouseY = 0
+
 async function humanMove(x, y) {
-  for (let i = 1; i <= 12; i++) {
-    const px = x * (i / 12), py = y * (i / 12)
+  const x0 = mouseX
+  const y0 = mouseY
+  const steps = 30
+  for (let i = 1; i <= steps; i++) {
+    const t = easeInOut(i / steps)
+    const px = x0 + (x - x0) * t
+    const py = y0 + (y - y0) * t
     await page.mouse.move(px, py)
     await toCursor(px, py)
-    await wait(16)
+    await wait(14)
+  }
+  mouseX = x
+  mouseY = y
+}
+
+async function smoothWheel(deltaY, steps = 14, stepMs = 28) {
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.wheel({ deltaY: deltaY / steps })
+    await wait(stepMs)
   }
 }
 
@@ -173,8 +193,8 @@ const recorder = await page.screencast({ path: WEBM, format: 'webm' })
 // Лендинг
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle0', timeout: 60000 })
 await wait(1200)
-await page.mouse.wheel({ deltaY: 400 }); await wait(600)
-await page.mouse.wheel({ deltaY: -400 }); await wait(700)
+await smoothWheel(400); await wait(600)
+await smoothWheel(-400); await wait(700)
 
 // Каталог: сортировка и живой поиск
 await page.goto(`${BASE}/explore`, { waitUntil: 'networkidle0', timeout: 60000 })
@@ -200,15 +220,21 @@ const pane = await page.$('.react-flow__pane')
 if (pane) {
   const b = await pane.boundingBox()
   const cx = b.x + b.width * 0.62, cy = b.y + b.height * 0.7
-  await page.mouse.move(cx, cy); await toCursor(cx, cy); await page.mouse.down()
-  for (let i = 1; i <= 20; i++) {
-    const px = cx + 60 - i * 6, py = cy + 40 - i * 4
-    await page.mouse.move(px, py); await toCursor(px, py); await wait(16)
+  await page.mouse.move(cx, cy); await toCursor(cx, cy)
+  mouseX = cx; mouseY = cy
+  await page.mouse.down()
+  const panSteps = 44
+  for (let i = 1; i <= panSteps; i++) {
+    // траектория пана + ease-in-out поверх, чтобы старт/финиш не дёргались
+    const nx = cx + 60 - i * 6, ny = cy + 40 - i * 4
+    const sx = cx + (nx - cx) * easeInOut(Math.min(1, (i / panSteps) * 1.2))
+    const sy = cy + (ny - cy) * easeInOut(Math.min(1, (i / panSteps) * 1.2))
+    await page.mouse.move(sx, sy); await toCursor(sx, sy); await wait(24)
   }
   await page.mouse.up(); await deselect(); await wait(600)
-  await page.mouse.move(450, 380)
-  await page.mouse.wheel({ deltaY: -240 }); await wait(400)
-  await page.mouse.wheel({ deltaY: -120 }); await wait(500)
+  await humanMove(450, 380)
+  await smoothWheel(-240); await wait(400)
+  await smoothWheel(-120); await wait(500)
 }
 
 // Прогресс: два узла — разблокировка пререквизитов + тосты достижений.
@@ -254,13 +280,13 @@ if (like) {
 // Дашборд: прогресс, streak, достижения
 await page.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle0', timeout: 60000 })
 await wait(1800)
-await page.mouse.wheel({ deltaY: 350 }); await wait(1300)
+await smoothWheel(350); await wait(1300)
 
 await recorder.stop()
 await browser.close()
 
 // --- Сборка GIF (palettegen/paletteuse, как у предыдущих артефактов) ---
 execFileSync('ffmpeg', ['-y', '-v', 'error', '-i', WEBM, '-vf',
-  `fps=${FPS},scale=1000:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4`,
+  `fps=${FPS},scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5`,
   '-loop', '0', GIF])
 console.log(`done: ${GIF} (webm-исходник: ${WEBM})`)
