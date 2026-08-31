@@ -165,7 +165,7 @@ export async function main() {
   await prisma.treeLike.deleteMany({ where: { treeId: seedTree.id, userId: user.id } })
   await prisma.user.delete({ where: { id: user.id } })
 
-  console.log('✅ Smoke пользовательского сценария пройден полностью')
+  console.log('Smoke пользовательского сценария пройден полностью')
 }
 
 // Запуск: через src/tests/smoke-journey.test.ts (alias server-only + mock auth)

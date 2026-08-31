@@ -125,7 +125,7 @@ const softSkillsTree: TreeSeed = {
 }
 
 async function main() {
-  console.log('🌱 Начало seed...')
+  console.log('Начало seed...')
 
   // Каталог достижений — upsert по коду, чтобы повторные прогоны не ломались.
   let achievementsSynced = 0
@@ -137,7 +137,7 @@ async function main() {
     })
     achievementsSynced += 1
   }
-  console.log(`🏆 Достижения синхронизированы: ${achievementsSynced}`)
+  console.log(`Достижения синхронизированы: ${achievementsSynced}`)
 
   const author = await prisma.user.upsert({
     where: { email: 'demo@skillet.dev' },
@@ -149,7 +149,7 @@ async function main() {
     },
   })
 
-  console.log('👤 Создан пользователь:', author.name)
+  console.log('Создан пользователь:', author.name)
 
   // Идемпотентность повторных прогонов: пересоздаём только сидируемые деревья
   // демо-автора. Пользовательские данные (другие авторы) не затрагиваются.
@@ -157,7 +157,7 @@ async function main() {
     where: { authorId: author.id },
   })
   if (deletedStale.count > 0) {
-    console.log(`🧹 Удалены устаревшие сидируемые деревья: ${deletedStale.count}`)
+    console.log(`Удалены устаревшие сидируемые деревья: ${deletedStale.count}`)
   }
 
   const treesToSeed = [frontendTree, softSkillsTree]
@@ -169,7 +169,7 @@ async function main() {
     const nodesData = buildNodesData(treeSeed.key, treeSeed.nodes)
 
     await prisma.$transaction(async (tx) => {
-      console.log(`🌳 Создание дерева «${treeSeed.title}»...`)
+      console.log(`Создание дерева «${treeSeed.title}»...`)
 
       // Вложенный create: Prisma сам подставит treeId для узлов.
       const tree = await tx.tree.create({
@@ -225,14 +225,14 @@ async function main() {
             completedAt: new Date(),
           },
         })
-        console.log('🎯 Создан начальный прогресс для первого узла')
+        console.log('Создан начальный прогресс для первого узла')
       }
 
       totalNodesCreated += tree.nodes.length
       totalEdgesCreated += edgesData.length
 
       console.log(
-        `✅ «${tree.title}»: узлов=${tree.nodes.length}, связей=${edgesData.length}`
+        `«${tree.title}»: узлов=${tree.nodes.length}, связей=${edgesData.length}`
       )
     })
   }
@@ -255,15 +255,15 @@ async function main() {
     prisma.userAchievement.count(),
   ])
 
-  console.log('🎉 Seed завершён успешно!')
-  console.log(`📊 Всего в БД: узлов=${nodeCount}, рёбер=${edgeCount}`)
-  console.log(`📊 Создано за прогон: узлов=${totalNodesCreated}, рёбер=${totalEdgesCreated}`)
-  console.log(`📊 Достижений в каталоге=${achievementTotal}, выдано пользователям=${userAchievementTotal}`)
+  console.log('Seed завершён успешно!')
+  console.log(`Всего в БД: узлов=${nodeCount}, рёбер=${edgeCount}`)
+  console.log(`Создано за прогон: узлов=${totalNodesCreated}, рёбер=${totalEdgesCreated}`)
+  console.log(`Достижений в каталоге=${achievementTotal}, выдано пользователям=${userAchievementTotal}`)
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Ошибка при seed:', e)
+    console.error('Ошибка при seed:', e)
     process.exit(1)
   })
   .finally(async () => {

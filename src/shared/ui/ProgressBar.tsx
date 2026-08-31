@@ -26,7 +26,7 @@ export function ProgressBar({ value, max = 100, size = 'md', ariaLabel = 'Про
       })}
     >
       <div
-        className={cn('h-full transition-all duration-300', {
+        className={cn('h-full transition-[width] duration-300', {
           'bg-success': filled === 100,
           'bg-primary': filled > 0 && filled < 100,
           'bg-transparent': filled === 0,

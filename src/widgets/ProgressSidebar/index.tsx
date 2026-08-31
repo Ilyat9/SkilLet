@@ -37,7 +37,7 @@ export function ProgressSidebar({ totalNodes, completedNodes }: ProgressSidebarP
 
         {allCompleted ? (
           <Badge variant="success" className="w-full justify-center">
-            Все навыки пройдены! 🎉
+            Все навыки пройдены
           </Badge>
         ) : (
           <div className="text-xs text-muted-foreground text-center">
